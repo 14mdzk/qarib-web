@@ -3,29 +3,21 @@
  *
  * Stack (in execution order):
  *   1. requestIdHandle    — generate per-request id, attach to locals, echo header.
- *   2. authHandle         — populate locals.session from `sid` cookie.
- *   3. paraglideHandle    — locale resolution + AsyncLocalStorage for messages.
- *   4. securityHandle     — apply CSP and other security headers (last so it sees the final response).
+ *   2. paraglideHandle    — locale resolution + AsyncLocalStorage for messages.
+ *   3. securityHandle     — apply CSP and other security headers (last so it sees the final response).
  *
  * Conformance:
  *   - rule .claude/rules/observability.md  (request id minted here, echoed downstream)
  *   - rule .claude/rules/security.md       (CSP, Referrer-Policy, X-Content-Type-Options, …)
- *   - rule .claude/rules/auth-and-session.md (session resolved server-side, never client-readable token)
  *   - rule .claude/rules/i18n.md           (locale comes from cookie, defaults to `en`)
- *   - ADR 0003                             (cookie session, transparent refresh, coalesced per-session)
+ *   - ADR 0009                             (no end-user auth; no session handle)
+ *   - ADR 0012                             (BFF is a public read-through proxy)
  */
 import { sequence } from '@sveltejs/kit/hooks';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { paraglideMiddleware } from '$lib/generated/paraglide/server.js';
 import { serverLogger } from '$core/logger/pino.server';
-import {
-	sessionStore,
-	toLocals,
-	clearAuthCookies,
-	transparentRefresh,
-	isNearExpiry
-} from '$core/auth/index';
 
 const REQUEST_ID_HEADER = 'x-request-id';
 
@@ -42,60 +34,6 @@ const requestIdHandle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 	response.headers.set(REQUEST_ID_HEADER, requestId);
 	return response;
-};
-
-/**
- * Read the `sid` cookie and populate `event.locals.session`.
- *
- * Pipeline:
- *   1. No sid cookie → session = null.
- *   2. sid present, no record in store → clear cookies, session = null.
- *   3. Record found, near expiry → transparent refresh via coalescer.
- *      - Refresh 401 → destroy session, clear cookies, session = null.
- *      - Refresh success → update locals with new record.
- *   4. Populate locals.session with { user, role, accessToken, expiresAt }.
- *
- * Conformance: rule auth-and-session.md, ADR 0003.
- */
-const authHandle: Handle = async ({ event, resolve }) => {
-	const sid = event.cookies.get('sid');
-
-	if (!sid) {
-		event.locals.session = null;
-		return resolve(event);
-	}
-
-	let record = await sessionStore.get(sid);
-
-	if (!record) {
-		// Stale or tampered sid — clear the orphaned cookies
-		clearAuthCookies(event.cookies);
-		event.locals.session = null;
-		serverLogger.debug(
-			{ requestId: event.locals.requestId },
-			'authHandle: sid present but no session record, cleared cookies'
-		);
-		return resolve(event);
-	}
-
-	if (isNearExpiry(record)) {
-		try {
-			record = await transparentRefresh(sid, record);
-		} catch {
-			// Refresh failed (expired or upstream error) — invalidate session
-			await sessionStore.delete(sid);
-			clearAuthCookies(event.cookies);
-			event.locals.session = null;
-			serverLogger.warn(
-				{ requestId: event.locals.requestId },
-				'authHandle: token refresh failed, session invalidated'
-			);
-			return resolve(event);
-		}
-	}
-
-	event.locals.session = toLocals(record);
-	return resolve(event);
 };
 
 /**
@@ -144,7 +82,7 @@ const securityHandle: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle = sequence(requestIdHandle, authHandle, paraglideHandle, securityHandle);
+export const handle = sequence(requestIdHandle, paraglideHandle, securityHandle);
 
 /**
  * Server-side error hook. Logs the full error with request id and returns a

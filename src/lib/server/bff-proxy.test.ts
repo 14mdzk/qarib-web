@@ -2,20 +2,50 @@
  * Unit tests for the BFF proxy's `buildProxyRequest` and `buildProxyResponse`
  * pure functions.
  *
- * Tests the header stripping, auth injection, request-id forwarding, and
- * SSE anti-buffering header injection logic in isolation — no SvelteKit
- * routing involved.
+ * Tests the header stripping, request-id forwarding, and SSE anti-buffering
+ * header injection logic in isolation — no SvelteKit routing involved.
+ *
+ * The BFF is a public read-through proxy (ADR 0009 / ADR 0012): no Bearer
+ * token is injected, no auth state is needed.
  */
 import { describe, it, expect } from 'vitest';
 import { buildProxyRequest, buildProxyResponse } from '$server/bff-proxy.js';
 
 const ABORT_SIGNAL = new AbortController().signal;
 
-function makeRequest(method: string, headers: Record<string, string> = {}, body?: string): Request {
+// ---------------------------------------------------------------------------
+// buildProxyRequest — public read-through (no Authorization)
+// ---------------------------------------------------------------------------
+
+describe('buildProxyRequest (public read-through)', () => {
+	it('forwards an allow-listed GET and injects no Authorization', () => {
+		const original = new Request('http://localhost/api/upstream/events/nearby?lat=1&lng=2', {
+			method: 'GET',
+			headers: { accept: 'application/json', cookie: 'sid=secret', origin: 'http://evil' }
+		});
+		const req = buildProxyRequest({
+			upstreamUrl: 'https://api.example.com/events/nearby?lat=1&lng=2',
+			originalRequest: original,
+			requestId: 'req-123',
+			signal: new AbortController().signal
+		});
+		expect(req.headers.get('authorization')).toBeNull();
+		expect(req.headers.get('cookie')).toBeNull();
+		expect(req.headers.get('origin')).toBeNull();
+		expect(req.headers.get('accept')).toBe('application/json');
+		expect(req.headers.get('x-request-id')).toBe('req-123');
+		expect(req.method).toBe('GET');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildProxyRequest — header stripping
+// ---------------------------------------------------------------------------
+
+function makeRequest(method: string, headers: Record<string, string> = {}): Request {
 	return new Request('http://browser.example.com/api/upstream/cameras', {
 		method,
-		headers,
-		body: method !== 'GET' && method !== 'HEAD' ? body : undefined
+		headers
 	});
 }
 
@@ -25,7 +55,6 @@ describe('buildProxyRequest — header stripping', () => {
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
@@ -37,7 +66,6 @@ describe('buildProxyRequest — header stripping', () => {
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
@@ -45,11 +73,10 @@ describe('buildProxyRequest — header stripping', () => {
 	});
 
 	it('strips the origin header', () => {
-		const req = makeRequest('POST', { origin: 'https://browser.example.com' });
+		const req = makeRequest('GET', { origin: 'https://browser.example.com' });
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
@@ -57,11 +84,10 @@ describe('buildProxyRequest — header stripping', () => {
 	});
 
 	it('strips x-csrf header (not in allow-list)', () => {
-		const req = makeRequest('POST', { 'x-csrf': 'tok123' });
+		const req = makeRequest('GET', { 'x-csrf': 'tok123' });
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
@@ -69,11 +95,10 @@ describe('buildProxyRequest — header stripping', () => {
 	});
 
 	it('forwards content-type', () => {
-		const req = makeRequest('POST', { 'content-type': 'application/json' });
+		const req = makeRequest('GET', { 'content-type': 'application/json' });
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
@@ -85,57 +110,34 @@ describe('buildProxyRequest — header stripping', () => {
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
 		expect(proxy.headers.get('accept')).toBe('application/json');
 	});
-
-	it('strips content-length to let fetch recompute or use chunked transfer', () => {
-		// Forwarding a stale content-length can cause upstream 400s when the
-		// body has been re-encoded or when duplex streaming is used (Fix 2, PR #8).
-		const req = makeRequest(
-			'POST',
-			{ 'content-length': '42', 'content-type': 'application/json' },
-			'{}'
-		);
-		const proxy = buildProxyRequest({
-			upstreamUrl: 'http://upstream/cameras',
-			originalRequest: req,
-			accessToken: null,
-			requestId: 'req-1',
-			signal: ABORT_SIGNAL
-		});
-		expect(proxy.headers.get('content-length')).toBeNull();
-	});
 });
 
-describe('buildProxyRequest — auth injection', () => {
-	it('sets Authorization header when accessToken is provided', () => {
-		const req = makeRequest('GET');
-		const proxy = buildProxyRequest({
-			upstreamUrl: 'http://upstream/cameras',
-			originalRequest: req,
-			accessToken: 'bearer-token-xyz',
-			requestId: 'req-1',
-			signal: ABORT_SIGNAL
-		});
-		expect(proxy.headers.get('Authorization')).toBe('Bearer bearer-token-xyz');
-	});
+// ---------------------------------------------------------------------------
+// buildProxyRequest — no Authorization header ever
+// ---------------------------------------------------------------------------
 
-	it('does not set Authorization header when accessToken is null', () => {
-		const req = makeRequest('GET');
+describe('buildProxyRequest — no Authorization', () => {
+	it('never sets an Authorization header (public proxy, ADR 0009)', () => {
+		const req = makeRequest('GET', { accept: 'application/json' });
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
+		expect(proxy.headers.get('authorization')).toBeNull();
 		expect(proxy.headers.get('Authorization')).toBeNull();
 	});
 });
+
+// ---------------------------------------------------------------------------
+// buildProxyRequest — request-id propagation
+// ---------------------------------------------------------------------------
 
 describe('buildProxyRequest — request-id propagation', () => {
 	it('sets x-request-id from the provided requestId', () => {
@@ -143,7 +145,6 @@ describe('buildProxyRequest — request-id propagation', () => {
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'my-trace-id',
 			signal: ABORT_SIGNAL
 		});
@@ -151,34 +152,47 @@ describe('buildProxyRequest — request-id propagation', () => {
 	});
 });
 
-describe('buildProxyRequest — URL', () => {
+// ---------------------------------------------------------------------------
+// buildProxyRequest — URL and method
+// ---------------------------------------------------------------------------
+
+describe('buildProxyRequest — URL and method', () => {
 	it('forwards the upstreamUrl unchanged', () => {
 		const req = makeRequest('GET');
 		const proxy = buildProxyRequest({
 			upstreamUrl: 'http://upstream/cameras?search=foo',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
 		expect(proxy.url).toBe('http://upstream/cameras?search=foo');
 	});
 
-	it('forwards the HTTP method', () => {
-		const req = makeRequest('DELETE');
+	it('preserves full query string verbatim (including multiple params)', () => {
+		const req = makeRequest('GET');
 		const proxy = buildProxyRequest({
-			upstreamUrl: 'http://upstream/cameras/1',
+			upstreamUrl: 'http://upstream/cameras?a=1&b=2',
 			originalRequest: req,
-			accessToken: null,
 			requestId: 'req-1',
 			signal: ABORT_SIGNAL
 		});
-		expect(proxy.method).toBe('DELETE');
+		expect(proxy.url).toBe('http://upstream/cameras?a=1&b=2');
+	});
+
+	it('always uses GET method even when original request is POST (read-through proxy)', () => {
+		const req = makeRequest('POST');
+		const proxy = buildProxyRequest({
+			upstreamUrl: 'http://upstream/cameras/1',
+			originalRequest: req,
+			requestId: 'req-1',
+			signal: ABORT_SIGNAL
+		});
+		expect(proxy.method).toBe('GET');
 	});
 });
 
 // ---------------------------------------------------------------------------
-// buildProxyResponse — SSE anti-buffering headers
+// buildProxyResponse — set-cookie stripping
 // ---------------------------------------------------------------------------
 
 function makeUpstreamResponse(
@@ -188,6 +202,36 @@ function makeUpstreamResponse(
 	const headers = new Headers({ 'content-type': contentType, ...extraHeaders });
 	return new Response(null, { status: 200, headers });
 }
+
+describe('buildProxyResponse — set-cookie stripping', () => {
+	it('strips set-cookie from the upstream response', () => {
+		const upstream = makeUpstreamResponse('application/json', {
+			'set-cookie': 'sid=secret; HttpOnly'
+		});
+		const proxy = buildProxyResponse(upstream);
+		expect(proxy.headers.get('set-cookie')).toBeNull();
+	});
+
+	it('preserves content-type', () => {
+		const upstream = makeUpstreamResponse('application/json');
+		const proxy = buildProxyResponse(upstream);
+		expect(proxy.headers.get('content-type')).toBe('application/json');
+	});
+
+	it('preserves upstream status code', () => {
+		const upstream = new Response(null, {
+			status: 404,
+			statusText: 'Not Found',
+			headers: new Headers()
+		});
+		const proxy = buildProxyResponse(upstream);
+		expect(proxy.status).toBe(404);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// buildProxyResponse — SSE anti-buffering headers (preserved from original)
+// ---------------------------------------------------------------------------
 
 describe('buildProxyResponse — text/event-stream anti-buffering headers', () => {
 	it('adds Cache-Control: no-cache, no-transform for text/event-stream', () => {

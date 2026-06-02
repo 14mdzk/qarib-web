@@ -9,15 +9,13 @@
  * a client module is a hard build error. Collocating as *.server.ts adds a
  * second layer — the vite plugin refuses to bundle it into client code.
  *
- * Consumers: hooks.server.ts (NODE_ENV), core/auth (SESSION_SECRET,
- * UPSTREAM_API_URL), BFF proxy endpoints.
+ * Consumers: hooks.server.ts (NODE_ENV), BFF proxy endpoints (UPSTREAM_API_URL).
  *
  * Conformance:
  *   - .claude/rules/security.md      (secrets server-side only, fail-fast)
- *   - .claude/rules/auth-and-session.md (SESSION_SECRET, UPSTREAM_API_URL)
  *   - .claude/rules/architecture.md  (server-only module, core/ layer)
  */
-import { UPSTREAM_API_URL, SESSION_SECRET } from '$env/static/private';
+import { UPSTREAM_API_URL } from '$env/static/private';
 import { parseServerEnv } from './schema.js';
 import type { DerivedServerEnv } from './schema.js';
 
@@ -34,6 +32,5 @@ export type { DerivedServerEnv };
  */
 export const serverConfig: DerivedServerEnv = parseServerEnv({
 	UPSTREAM_API_URL,
-	SESSION_SECRET,
 	NODE_ENV: process.env.NODE_ENV
 });

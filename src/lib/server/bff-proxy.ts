@@ -1,14 +1,19 @@
 /**
- * BFF proxy helpers.
+ * BFF proxy helpers — public read-through.
+ *
+ * The Qarib web app has no end-user auth (ADR 0009). The BFF is a public
+ * read-through proxy that forwards safe, allow-listed headers to the upstream
+ * API and never injects an Authorization token (ADR 0012).
  *
  * Extracted from `routes/api/upstream/[...path]/+server.ts` so they can be
  * unit-tested without SvelteKit routing, and so the route file only exports
  * the HTTP method handlers that SvelteKit allows.
  *
  * Conformance:
- *   - rule .claude/rules/auth-and-session.md (Bearer injected server-side)
- *   - rule .claude/rules/security.md (header stripping)
- *   - rule .claude/rules/observability.md (x-request-id propagated)
+ *   - ADR 0009 (no end-user auth; public API)
+ *   - ADR 0012 (BFF is a public read-through proxy; no Bearer)
+ *   - rule .claude/rules/security.md (header stripping; no cookies, host, origin forwarded)
+ *   - rule .claude/rules/observability.md (x-request-id propagated for log correlation)
  */
 
 /**
@@ -24,17 +29,17 @@ const ALLOWED_REQUEST_HEADERS = new Set([
 ]);
 
 /**
- * Build the upstream Request, stripping browser-sensitive headers and
- * injecting the server-side Bearer token and request id.
+ * Build the upstream Request, stripping browser-sensitive headers.
+ * No Authorization header is injected — this is a public read-through proxy
+ * per ADR 0009 and ADR 0012.
  */
 export function buildProxyRequest(params: {
 	upstreamUrl: string;
 	originalRequest: Request;
-	accessToken: string | null;
 	requestId: string;
 	signal: AbortSignal;
 }): Request {
-	const { upstreamUrl, originalRequest, accessToken, requestId, signal } = params;
+	const { upstreamUrl, originalRequest, requestId, signal } = params;
 
 	const headers = new Headers();
 
@@ -45,30 +50,15 @@ export function buildProxyRequest(params: {
 		}
 	}
 
-	// Inject server-side Bearer token
-	if (accessToken) {
-		headers.set('Authorization', `Bearer ${accessToken}`);
-	}
-
 	// Forward request id for log correlation across services (rule observability.md)
 	headers.set('x-request-id', requestId);
 
-	return new Request(upstreamUrl, {
-		method: originalRequest.method,
-		headers,
-		body:
-			originalRequest.method !== 'GET' && originalRequest.method !== 'HEAD'
-				? originalRequest.body
-				: null,
-		// @ts-expect-error — duplex is required for streaming POST/PUT bodies in Node 18+
-		duplex: 'half',
-		signal
-	});
+	return new Request(upstreamUrl, { method: 'GET', headers, signal });
 }
 
 /**
  * Strip headers from the upstream response that must not reach the browser.
- * `set-cookie` is stripped because tokens are held server-side only.
+ * `set-cookie` is stripped because the BFF must not leak upstream session state.
  *
  * When the upstream Content-Type is `text/event-stream`, anti-buffering headers
  * are added so the stream is not collapsed by intermediate proxies (nginx,
@@ -81,7 +71,8 @@ export function buildProxyRequest(params: {
  *     across the proxy boundary so the stream is not torn down prematurely.
  *
  * Conformance:
- *   - rule .claude/rules/realtime.md (SSE through BFF, no token in browser)
+ *   - rule .claude/rules/realtime.md (SSE through BFF)
+ *   - rule .claude/rules/security.md (no upstream cookies forwarded to browser)
  */
 export function buildProxyResponse(upstreamResponse: Response): Response {
 	const headers = new Headers(upstreamResponse.headers);
