@@ -48,7 +48,7 @@ describe('api() — happy path', () => {
 describe('api() — error envelope', () => {
 	it('throws ApiError with upstream code and message on success:false', async () => {
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', () =>
+			http.get('http://localhost/api/upstream/users/me', () =>
 				HttpResponse.json(
 					{
 						success: false,
@@ -74,7 +74,7 @@ describe('api() — HTTP errors', () => {
 	it('throws ApiError with code HTTP_ERROR on 500 status', async () => {
 		server.use(
 			http.get(
-				'http://localhost/api/upstream/auth/session',
+				'http://localhost/api/upstream/users/me',
 				() => new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' })
 			)
 		);
@@ -87,7 +87,7 @@ describe('api() — HTTP errors', () => {
 	it('throws ApiError with code HTTP_ERROR on 401 status', async () => {
 		server.use(
 			http.get(
-				'http://localhost/api/upstream/auth/session',
+				'http://localhost/api/upstream/users/me',
 				() => new HttpResponse(null, { status: 401, statusText: 'Unauthorized' })
 			)
 		);
@@ -132,7 +132,7 @@ describe('api() — network failure', () => {
 describe('api() — unexpected shape', () => {
 	it('throws ApiError with code UNEXPECTED_SHAPE when response has no success field', async () => {
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', () =>
+			http.get('http://localhost/api/upstream/users/me', () =>
 				HttpResponse.json({ notAnEnvelope: true })
 			)
 		);
@@ -152,7 +152,7 @@ describe('api() — requestId propagation', () => {
 		let capturedRequestId: string | null = null;
 
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', ({ request }) => {
+			http.get('http://localhost/api/upstream/users/me', ({ request }) => {
 				capturedRequestId = request.headers.get('x-request-id');
 				return HttpResponse.json({
 					success: true,
@@ -173,7 +173,7 @@ describe('api() — requestId propagation', () => {
 		let capturedRequestId: string | null = 'sentinel';
 
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', ({ request }) => {
+			http.get('http://localhost/api/upstream/users/me', ({ request }) => {
 				capturedRequestId = request.headers.get('x-request-id');
 				return HttpResponse.json({
 					success: true,

@@ -124,7 +124,7 @@ describe('buildMutationOptions — mutationFn error paths', () => {
 	it('throws ApiError with HTTP_ERROR code on 500', async () => {
 		server.use(
 			http.get(
-				'http://localhost/api/upstream/auth/session',
+				'http://localhost/api/upstream/users/me',
 				() => new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' })
 			)
 		);
@@ -139,7 +139,7 @@ describe('buildMutationOptions — mutationFn error paths', () => {
 
 	it('throws ApiError with upstream code on success:false envelope', async () => {
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', () =>
+			http.get('http://localhost/api/upstream/users/me', () =>
 				HttpResponse.json({
 					success: false,
 					error: { code: 'FORBIDDEN', message: 'Access denied' }

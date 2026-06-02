@@ -132,7 +132,7 @@ describe('buildQueryOptions — queryFn error paths', () => {
 	it('throws ApiError with HTTP_ERROR on 500', async () => {
 		server.use(
 			http.get(
-				'http://localhost/api/upstream/auth/session',
+				'http://localhost/api/upstream/users/me',
 				() => new HttpResponse(null, { status: 500, statusText: 'Internal Server Error' })
 			)
 		);
@@ -148,7 +148,7 @@ describe('buildQueryOptions — queryFn error paths', () => {
 
 	it('throws ApiError with upstream code on success:false envelope', async () => {
 		server.use(
-			http.get('http://localhost/api/upstream/auth/session', () =>
+			http.get('http://localhost/api/upstream/users/me', () =>
 				HttpResponse.json({
 					success: false,
 					error: { code: 'UNAUTHORIZED', message: 'Not authenticated' }
@@ -178,7 +178,7 @@ describe('buildQueryOptions — fetchQuery integration', () => {
 		const result = await client.fetchQuery({
 			queryKey: ['auth.session', undefined] as const,
 			queryFn: async ({ signal }) => {
-				const res = await globalThis.fetch('http://localhost/api/upstream/auth/session', {
+				const res = await globalThis.fetch('http://localhost/api/upstream/users/me', {
 					signal
 				});
 				const json = (await res.json()) as { success: boolean; data: unknown };

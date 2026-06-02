@@ -2,6 +2,8 @@
 build
 node_modules
 src/lib/generated
+# Vendored upstream spec snapshot — must not be reformatted (CI diffs it against the source).
+openapi/
 static
 coverage
 playwright-report

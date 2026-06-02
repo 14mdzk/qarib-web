@@ -19,7 +19,7 @@ describe('Endpoints registry', () => {
 	describe('auth.session', () => {
 		it('path builder returns the correct BFF path', () => {
 			const path = Endpoints['auth.session'].path(undefined as void);
-			expect(path).toBe('/api/upstream/auth/session');
+			expect(path).toBe('/api/upstream/users/me');
 		});
 
 		it('has GET method', () => {

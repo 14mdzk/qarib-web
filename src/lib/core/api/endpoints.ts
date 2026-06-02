@@ -88,15 +88,15 @@ export function defineEndpoint<Args = void, Body = void, Response = unknown>(
 
 export const Endpoints = {
 	/**
-	 * Retrieve the current authenticated session from the upstream.
+	 * Retrieve the current authenticated user from the upstream.
 	 *
-	 * Routed through the BFF at `/api/upstream/auth/session` so the server
+	 * Routed through the BFF at `/api/upstream/users/me` so the server
 	 * can inject the Authorization header without exposing the token to the
 	 * browser (see rule auth-and-session.md, ADR 0003).
 	 */
-	'auth.session': defineEndpoint<void, void, DataOf<Get200<'/auth/session', 'get'>>>({
+	'auth.session': defineEndpoint<void, void, DataOf<Get200<'/users/me', 'get'>>>({
 		method: 'GET',
-		path: () => '/api/upstream/auth/session'
+		path: () => '/api/upstream/users/me'
 	}),
 
 	/**
