@@ -17,7 +17,7 @@ import { http, HttpResponse } from 'msw';
  * Override per-test with `server.use(...)` for error scenarios.
  */
 export const server = setupServer(
-	http.get('http://localhost/api/upstream/auth/session', () =>
+	http.get('http://localhost/api/upstream/users/me', () =>
 		HttpResponse.json({
 			success: true,
 			data: { user: { id: '1', email: 'a@b.com' }, role: 'admin' }

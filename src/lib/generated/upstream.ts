@@ -4,15 +4,63 @@
  */
 
 export interface paths {
-    "/auth/session": {
+    "/healthz/live": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Return the current session info */
-        get: operations["getAuthSession"];
+        /**
+         * Liveness check
+         * @description Checks whether the application process is alive. Always returns 200.
+         *     Does not probe any dependency. Use as a Kubernetes liveness probe target.
+         */
+        get: operations["livenessCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/healthz/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness check
+         * @description Runs all dependency sub-checks (Postgres, Redis, …) in parallel under a
+         *     configurable deadline (default 2 s). Returns 200 when every check passes,
+         *     503 when any check fails. NoOp adapters report `<name>(noop)` and always pass.
+         *     Use as a Kubernetes readiness probe target.
+         */
+        get: operations["readinessCheck"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Liveness check (deprecated alias)
+         * @description Deprecated back-compat alias for `/healthz/live`. Kept for existing probes.
+         *     Migrate to `/healthz/live`.
+         */
+        get: operations["healthCheckAlias"];
         put?: never;
         post?: never;
         delete?: never;
@@ -30,25 +78,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange credentials for tokens */
-        post: operations["postAuthLogin"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Revoke the current session */
-        post: operations["postAuthLogout"];
+        /**
+         * Login
+         * @description Authenticates a user with email and password, returning a JWT access token
+         *     and a refresh token.
+         *
+         *     This endpoint is rate-limited to **20 requests per 5 minutes per IP**
+         *     (fail-closed: returns 503 when the Redis rate-limit backend is unavailable).
+         */
+        post: operations["login"];
         delete?: never;
         options?: never;
         head?: never;
@@ -64,8 +102,471 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate the access token using a refresh token */
-        post: operations["postAuthRefresh"];
+        /**
+         * Refresh access token
+         * @description Exchanges a valid refresh token for a new pair of access and refresh tokens.
+         *     Only `refresh_token` is required in the body; the server resolves the user ID
+         *     internally from the lookup key.
+         *
+         *     Same rate limit as `/auth/login` (20 req / 5 min per IP, fail-closed).
+         */
+        post: operations["refreshToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Invalidates the given refresh token. Requires a valid JWT access token in
+         *     the `Authorization: Bearer` header. The caller ID is extracted from the JWT
+         *     claims server-side; it is not accepted in the request body.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current user
+         * @description Returns the profile of the authenticated caller, resolved from the JWT
+         *     access token. Requires a valid `Authorization: Bearer` token; no
+         *     additional permission is required beyond authentication.
+         */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users
+         * @description Returns a cursor-paginated list of users. Requires a valid JWT and the
+         *     `users:read` permission (enforced via Casbin against the caller's role).
+         */
+        get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user by ID
+         * @description Returns a single user by ID. Requires a valid JWT and the `users:read`
+         *     permission (enforced via Casbin against the caller's role).
+         */
+        get: operations["getUserByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List regions
+         * @description Returns a cursor-paginated list of administrative regions. Public endpoint.
+         */
+        get: operations["listRegions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/regions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get region by ID
+         * @description Returns a single region by its ID. Public endpoint.
+         */
+        get: operations["getRegionByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List event occurrences
+         * @description Returns a cursor-paginated discovery list of event occurrences (recurrings).
+         *     Supports filtering by event series, place, asatidz, subject, status, and date range.
+         *     Public endpoint.
+         */
+        get: operations["listRecurrings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/nearby": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Spatial event discovery
+         * @description Returns a cursor-paginated list of upcoming event occurrences near a geographic
+         *     point. Provide either (`lat` + `lng`) for point-based search or `region_id` for
+         *     region-based search (or both). `radius_km` defaults to a server-side value when
+         *     omitted; max 100 km. Public endpoint.
+         */
+        get: operations["listNearbyEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get event occurrence by ID
+         * @description Returns a single event occurrence (recurring) by its integer ID. Public endpoint.
+         *     Returns 404 when the ID is not a valid integer or the occurrence does not exist.
+         */
+        get: operations["getRecurring"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/series/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get event series by slug
+         * @description Returns the event series template for the given slug. Public endpoint.
+         */
+        get: operations["getSeriesBySlug"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/series/{slug}/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List upcoming occurrences for a series
+         * @description Returns a cursor-paginated list of future event occurrences for the given series.
+         *     Public endpoint.
+         */
+        get: operations["listSeriesUpcoming"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events/series/{slug}/recurrings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all occurrences for a series
+         * @description Returns a cursor-paginated list of all event occurrences (past and future)
+         *     for the given series. Public endpoint.
+         */
+        get: operations["listSeriesRecurrings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/authors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List authors
+         * @description Returns a cursor-paginated list of authors. Public endpoint.
+         */
+        get: operations["listAuthors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/authors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get author by ID
+         * @description Returns a single author by their UUID. Public endpoint.
+         */
+        get: operations["getAuthorByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List subjects
+         * @description Returns a cursor-paginated list of subjects (Islamic topics). Public endpoint.
+         */
+        get: operations["listSubjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subjects/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get subject by ID
+         * @description Returns a single subject by its UUID. Public endpoint.
+         */
+        get: operations["getSubjectByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asatidzs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List asatidzs
+         * @description Returns a cursor-paginated list of asatidzs (Islamic scholars). Public endpoint.
+         */
+        get: operations["listAsatidzs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/asatidzs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asatidz by ID
+         * @description Returns a single asatidz by their UUID. Public endpoint.
+         */
+        get: operations["getAsatidzByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/places": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List places
+         * @description Returns a cursor-paginated list of venues / places. Supports filtering by region
+         *     and optional spatial search (provide all three of `near_lat`, `near_lng`,
+         *     `radius_km` for nearby filtering). Public endpoint.
+         */
+        get: operations["listPlaces"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/places/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get place by ID
+         * @description Returns a single place by its UUID. Public endpoint.
+         */
+        get: operations["getPlaceByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List references
+         * @description Returns a cursor-paginated list of reference materials (books, texts). Public endpoint.
+         */
+        get: operations["listReferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/references/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get reference by ID
+         * @description Returns a single reference by its UUID. Public endpoint.
+         */
+        get: operations["getReferenceByID"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -76,59 +577,591 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        SessionUser: {
-            id: string;
-            email: string;
-        };
-        SessionData: {
-            user: components["schemas"]["SessionUser"];
-            role: string;
-        };
-        SessionEnvelope: {
+        SuccessResponse: {
+            /** @example true */
             success: boolean;
-            data: components["schemas"]["SessionData"];
-            message?: string;
+            /** @description Response payload (type varies per endpoint) */
+            data?: unknown;
+        };
+        MessageResponse: {
+            /** @example true */
+            success: boolean;
+            /** @example Logged out successfully */
+            message: string;
+        };
+        ErrorResponse: {
+            /** @example false */
+            success: boolean;
+            error: {
+                /**
+                 * @description Machine-readable error code
+                 * @enum {string}
+                 */
+                code: "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "UNPROCESSABLE_ENTITY" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "VALIDATION_ERROR" | "RATE_LIMIT_EXCEEDED" | "RATE_LIMIT_ERROR" | "UNSUPPORTED_MEDIA_TYPE";
+                /** @description Human-readable error message */
+                message: string;
+                /** @description Per-field validation details (present on 400 responses) */
+                details?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** @description Cursor-based pagination metadata included in all paginated responses. */
+        PaginationMeta: {
+            /** @description Opaque base64-encoded cursor; pass as `cursor` to fetch the next page. Absent when `has_more` is false. */
+            next_cursor?: string | null;
+            /** @description Opaque base64-encoded cursor; pass as `cursor` to fetch the previous page. Absent when `has_prev` is false. */
+            prev_cursor?: string | null;
+            /** @description True when additional items exist after this page. */
+            has_more?: boolean;
+            /** @description True when items exist before this page. */
+            has_prev?: boolean;
+            /**
+             * Format: int64
+             * @description Total item count (included when the query pre-counted; otherwise absent).
+             */
+            total?: number | null;
+        };
+        /**
+         * @description Localized string map keyed by IETF language code.
+         *     Typical keys are `"id"` (Indonesian) and `"en"` (English).
+         *     The server falls back to `"id"` then `"en"` when the requested locale is absent.
+         * @example {
+         *       "id": "Tafsir Al-Quran",
+         *       "en": "Quran Exegesis"
+         *     }
+         */
+        L10nString: {
+            [key: string]: string;
+        };
+        LivenessResponse: {
+            /**
+             * @example alive
+             * @enum {string}
+             */
+            status: "alive";
+            /** Format: date-time */
+            timestamp: string;
+        };
+        ReadinessResponse: {
+            /**
+             * @description 'ready' when all sub-checks pass; 'degraded' when any fail
+             * @example ready
+             * @enum {string}
+             */
+            status?: "ready" | "degraded";
+            /** Format: date-time */
+            timestamp?: string;
+            /**
+             * @description Per-check result map. Value is "ok" on success, or a short sanitised
+             *     error reason on failure. NoOp adapters appear as "<name>(noop)".
+             * @example {
+             *       "database": "ok",
+             *       "cache(noop)": "ok"
+             *     }
+             */
+            checks?: {
+                [key: string]: string;
+            };
         };
         LoginRequest: {
-            /** Format: email */
+            /**
+             * Format: email
+             * @example operator@example.com
+             */
             email: string;
+            /**
+             * Format: password
+             * @example s3cr3tP@ss
+             */
             password: string;
         };
-        TokensData: {
-            accessToken: string;
-            refreshToken: string;
-            /** @description Seconds until access token expires */
-            expiresIn: number;
-            user: components["schemas"]["SessionUser"];
-            role: string;
+        LoginResponse: {
+            /** @description Short-lived JWT access token */
+            access_token?: string;
+            /** @description Long-lived opaque refresh token */
+            refresh_token?: string;
+            /**
+             * @description Access token lifetime in seconds
+             * @example 900
+             */
+            expires_in?: number;
+            /** @example Bearer */
+            token_type?: string;
         };
-        LoginEnvelope: {
-            success: boolean;
-            data: components["schemas"]["TokensData"];
-            message?: string;
-        };
+        /** @description Only `refresh_token` is required. `user_id` is not accepted. */
         RefreshRequest: {
-            refreshToken: string;
+            /** @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... */
+            refresh_token: string;
         };
-        TokensEnvelope: {
-            success: boolean;
-            data: components["schemas"]["TokensData"];
-            message?: string;
+        RefreshResponse: {
+            access_token?: string;
+            refresh_token?: string;
+            /**
+             * @description Access token lifetime in seconds
+             * @example 900
+             */
+            expires_in?: number;
+            /** @example Bearer */
+            token_type?: string;
         };
-        OkEnvelope: {
+        /**
+         * @description The caller ID is extracted server-side from the JWT claims (via `Authorization: Bearer`
+         *     header). It is not accepted in the body.
+         */
+        LogoutRequest: {
+            /** @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... */
+            refresh_token: string;
+        };
+        UserResponse: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: email */
+            email?: string;
+            /** @description Role slug used as the Casbin authorization subject (e.g. "super_admin") */
+            role?: string;
+            name?: string;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedUserResponse: {
+            /** @example true */
             success: boolean;
-            message?: string;
+            data: components["schemas"]["UserResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        RegionResponse: {
+            /**
+             * @description Region ID (may be a numeric code string, not necessarily a UUID)
+             * @example 3273
+             */
+            id?: string;
+            /** @example Kota Bandung */
+            name?: string;
+            /**
+             * Format: double
+             * @example -6.9175
+             */
+            latitude?: number | null;
+            /**
+             * Format: double
+             * @example 107.6191
+             */
+            longitude?: number | null;
+            /** @description Elevation in metres above sea level */
+            location_elv?: number | null;
+            /** @description UTC offset in minutes (e.g. 420 for WIB UTC+7) */
+            location_tz?: number | null;
+            /**
+             * @description Hierarchical path from root to this region
+             * @example [
+             *       "32",
+             *       "3273"
+             *     ]
+             */
+            location_path?: string[];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedRegionResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["RegionResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        EventSeriesResponse: {
+            /**
+             * Format: uuid
+             * @description Event series UUID
+             */
+            id?: string;
+            /** @description URL-friendly identifier */
+            slug?: string | null;
+            name?: components["schemas"]["L10nString"];
+            description?: components["schemas"]["L10nString"] | null;
+            /** Format: uuid */
+            subject_id?: string | null;
+            /** Format: uuid */
+            place_id?: string;
+            /** Format: uuid */
+            asatidz_id?: string;
+            /** Format: uuid */
+            reference_id?: string | null;
+            /**
+             * Format: date-time
+             * @description Series start date
+             */
+            date_start?: string;
+            /**
+             * Format: date-time
+             * @description Series end date (null for open-ended series)
+             */
+            date_end?: string | null;
+            /** @description Prayer time reference integer (domain-specific encoding) */
+            date_prayer?: number;
+            /** @description Recurrence rule string (iCal RRULE format or custom) */
+            date_rule?: string | null;
+            /** @description Event type integer (domain-specific encoding) */
+            event_type?: number;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            /** @description Full place object. Present only when `?expand=place` is requested. */
+            place?: components["schemas"]["PlaceResponse"] | null;
+            /** @description Full asatidz object. Present only when `?expand=asatidz` is requested. */
+            asatidz?: components["schemas"]["AsatidzResponse"] | null;
+        };
+        EventRecurringResponse: {
+            /**
+             * Format: int64
+             * @description Occurrence integer ID
+             */
+            id?: number;
+            /**
+             * Format: uuid
+             * @description Parent event series UUID
+             */
+            event_id?: string;
+            /** @description Override name (null when inherited from the series) */
+            name?: components["schemas"]["L10nString"] | null;
+            /** @description Override description (null when inherited from the series) */
+            description?: components["schemas"]["L10nString"] | null;
+            /**
+             * Format: uuid
+             * @description Override asatidz (null when inherited from the series)
+             */
+            asatidz_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Override place (null when inherited from the series)
+             */
+            place_id?: string | null;
+            /** Format: date-time */
+            date_start?: string;
+            /** Format: date-time */
+            date_end?: string | null;
+            date_prayer?: number;
+            /** @description Occurrence status: Incoming=0, Ongoing=1, Cancelled=10, Rescheduled=11, Completed=99 */
+            status?: number;
+            /** @description Number of users who marked as going */
+            going_count?: number;
+            /** @description True when this occurrence has been overridden from the series default */
+            is_modified?: boolean;
+            cancellation_reason?: string | null;
+            /**
+             * Format: double
+             * @description Distance from search origin in km (populated only in /events/nearby responses)
+             */
+            distance_km?: number | null;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            /**
+             * @description Full place object. Present only when `?expand=place` is requested.
+             *     Resolved from the occurrence's own place_id if set, otherwise from
+             *     the parent event series place_id (effective ID).
+             */
+            place?: components["schemas"]["PlaceResponse"] | null;
+            /**
+             * @description Full asatidz object. Present only when `?expand=asatidz` is requested.
+             *     Resolved from the occurrence's own asatidz_id if set, otherwise from
+             *     the parent event series asatidz_id (effective ID).
+             */
+            asatidz?: components["schemas"]["AsatidzResponse"] | null;
+        };
+        PaginatedEventRecurringResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["EventRecurringResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        AuthorResponse: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string;
+            name?: components["schemas"]["L10nString"];
+            bio?: components["schemas"]["L10nString"] | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedAuthorResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["AuthorResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        SubjectResponse: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string;
+            name?: components["schemas"]["L10nString"];
+            description?: components["schemas"]["L10nString"] | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedSubjectResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SubjectResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        AsatidzResponse: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string;
+            name?: components["schemas"]["L10nString"];
+            alias_name?: components["schemas"]["L10nString"] | null;
+            /**
+             * @description 1 = Male, 2 = Female
+             * @enum {integer}
+             */
+            gender?: 1 | 2;
+            description?: components["schemas"]["L10nString"] | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedAsatidzResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["AsatidzResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        PlaceResponse: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string;
+            name?: components["schemas"]["L10nString"];
+            description?: components["schemas"]["L10nString"] | null;
+            phone?: string | null;
+            address?: string | null;
+            /** Format: uuid */
+            region_id?: string | null;
+            /**
+             * Format: double
+             * @description Latitude (WGS-84)
+             */
+            lat?: number | null;
+            /**
+             * Format: double
+             * @description Longitude (WGS-84)
+             */
+            lng?: number | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedPlaceResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["PlaceResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
+        };
+        ReferenceResponse: {
+            /** Format: uuid */
+            id?: string;
+            slug?: string;
+            name?: components["schemas"]["L10nString"];
+            description?: components["schemas"]["L10nString"] | null;
+            /** Format: uuid */
+            author_id?: string | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        PaginatedReferenceResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["ReferenceResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Bad request or validation error */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "VALIDATION_ERROR",
+                 *         "message": "Validation failed",
+                 *         "details": {
+                 *           "limit": "must be between 1 and 100"
+                 *         }
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Authentication required or invalid / expired token */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "UNAUTHORIZED",
+                 *         "message": "Authentication required"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Authenticated but lacking the required permission */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "FORBIDDEN",
+                 *         "message": "You do not have permission to perform this action"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Resource not found */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "NOT_FOUND",
+                 *         "message": "Resource not found"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Rate limit exceeded */
+        TooManyRequests: {
+            headers: {
+                "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
+                "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
+                "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "RATE_LIMIT_EXCEEDED",
+                 *         "message": "Too many requests, please try again later"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /**
+         * @description Rate-limit backend unavailable (fail-closed). Returned when the Redis
+         *     backend is down and `FailClosed=true` is set on the rate-limit middleware.
+         *     Applies to `/auth/login` and `/auth/refresh`.
+         */
+        ServiceUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "RATE_LIMIT_ERROR",
+                 *         "message": "Service temporarily unavailable, please try again later"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description Internal server error */
+        InternalError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "success": false,
+                 *       "error": {
+                 *         "code": "INTERNAL_ERROR",
+                 *         "message": "An unexpected error occurred"
+                 *       }
+                 *     }
+                 */
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+    };
+    parameters: {
+        /** @description Resource UUID */
+        ResourceID: string;
+        /**
+         * @description Comma-separated list of related objects to embed inline.
+         *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+         *     When omitted, only bare IDs are returned (backward-compatible default).
+         */
+        ExpandPlaceAsatidz: string;
+        /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+        Cursor: string;
+        /** @description Number of items per page (default: 20, max: 100) */
+        Limit: number;
+    };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Maximum requests allowed in the current rate-limit window. */
+        "X-RateLimit-Limit": number;
+        /** @description Requests remaining in the current window. */
+        "X-RateLimit-Remaining": number;
+        /** @description Unix timestamp (seconds) at which the current window resets. */
+        "X-RateLimit-Reset": number;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    getAuthSession: {
+    livenessCheck: {
         parameters: {
             query?: never;
             header?: never;
@@ -137,25 +1170,67 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description OK */
+            /** @description Process is alive */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionEnvelope"];
+                    "application/json": components["schemas"]["LivenessResponse"];
                 };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
         };
     };
-    postAuthLogin: {
+    readinessCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All dependency checks passed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            /** @description One or more dependency checks failed */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    healthCheckAlias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Process is alive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LivenessResponse"];
+                };
+            };
+        };
+    };
+    login: {
         parameters: {
             query?: never;
             header?: never;
@@ -168,59 +1243,28 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description Login successful */
             200: {
                 headers: {
+                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
+                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
+                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LoginEnvelope"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["LoginResponse"];
+                    };
                 };
             };
-            /** @description Invalid credentials */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Too many requests */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
-    postAuthLogout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkEnvelope"];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    postAuthRefresh: {
+    refreshToken: {
         parameters: {
             query?: never;
             header?: never;
@@ -233,22 +1277,736 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description Token refreshed */
+            200: {
+                headers: {
+                    "X-RateLimit-Limit": components["headers"]["X-RateLimit-Limit"];
+                    "X-RateLimit-Remaining": components["headers"]["X-RateLimit-Remaining"];
+                    "X-RateLimit-Reset": components["headers"]["X-RateLimit-Reset"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["RefreshResponse"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogoutRequest"];
+            };
+        };
+        responses: {
+            /** @description Logged out successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokensEnvelope"];
+                    "application/json": components["schemas"]["MessageResponse"];
                 };
             };
-            /** @description Refresh token invalid or expired */
-            401: {
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user profile */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["UserResponse"];
+                    };
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or email (partial match) */
+                search?: string;
+                /** @description Exact email match */
+                email?: string;
+                /** @description Filter by active status */
+                is_active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of users */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedUserResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getUserByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["UserResponse"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listRegions: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by region name (partial match) */
+                search?: string;
+                /** @description Parent region code to filter children (e.g. "32" for cities in West Java) */
+                parent?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of regions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedRegionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getRegionByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Region found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["RegionResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listRecurrings: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+                /** @description Filter by event series UUID */
+                event_id?: string;
+                /** @description Filter by place UUID */
+                place_id?: string;
+                /** @description Filter by asatidz UUID */
+                asatidz_id?: string;
+                /** @description Filter by subject UUID */
+                subject_id?: string;
+                /** @description Filter by occurrence status (integer) */
+                status?: number;
+                /** @description Filter occurrences on or after this date-time (RFC3339) */
+                date_from?: string;
+                /** @description Filter occurrences on or before this date-time (RFC3339) */
+                date_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of event occurrences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventRecurringResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listNearbyEvents: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+                /** @description Number of items per page (default: 20, max: 200) */
+                limit?: number;
+                /** @description Latitude of the search origin (decimal degrees, WGS-84) */
+                lat?: number;
+                /** @description Longitude of the search origin (decimal degrees, WGS-84) */
+                lng?: number;
+                /** @description Search radius in kilometres (min: 0.1, max: 100) */
+                radius_km?: number;
+                /** @description Filter by region UUID (alternative / complement to lat/lng) */
+                region_id?: string;
+                /** @description Filter by subject UUID */
+                subject_id?: string;
+                /** @description Filter occurrences on or after this date-time (RFC3339) */
+                date_from?: string;
+                /** @description Filter occurrences on or before this date-time (RFC3339) */
+                date_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of nearby event occurrences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventRecurringResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getRecurring: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+            };
+            header?: never;
+            path: {
+                /** @description Event occurrence integer ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event occurrence found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["EventRecurringResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSeriesBySlug: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+            };
+            header?: never;
+            path: {
+                /** @description Event series slug */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event series found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["EventSeriesResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listSeriesUpcoming: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+            };
+            header?: never;
+            path: {
+                /** @description Event series slug */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of upcoming occurrences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventRecurringResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listSeriesRecurrings: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+            };
+            header?: never;
+            path: {
+                /** @description Event series slug */
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of all occurrences for the series */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventRecurringResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAuthors: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or slug (partial match) */
+                search?: string;
+                /** @description Filter by active status */
+                is_active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of authors */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAuthorResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getAuthorByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Author found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["AuthorResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listSubjects: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or slug (partial match) */
+                search?: string;
+                /** @description Filter by active status */
+                is_active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of subjects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedSubjectResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSubjectByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subject found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["SubjectResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAsatidzs: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or slug (partial match) */
+                search?: string;
+                /** @description Filter by gender (1 = Male, 2 = Female) */
+                gender?: 1 | 2;
+                /** @description Filter by active status */
+                is_active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of asatidzs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAsatidzResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getAsatidzByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Asatidz found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["AsatidzResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPlaces: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or slug (partial match) */
+                search?: string;
+                /** @description Filter by region UUID */
+                region_id?: string;
+                /** @description Filter by active status */
+                is_active?: boolean;
+                /** @description Latitude for spatial search (requires near_lng + radius_km) */
+                near_lat?: number;
+                /** @description Longitude for spatial search (requires near_lat + radius_km) */
+                near_lng?: number;
+                /** @description Search radius in kilometres (requires near_lat + near_lng) */
+                radius_km?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of places */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedPlaceResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getPlaceByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Place found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["PlaceResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listReferences: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /** @description Search by name or slug (partial match) */
+                search?: string;
+                /** @description Filter by author UUID */
+                author_id?: string;
+                /** @description Filter by active status */
+                is_active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of references */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedReferenceResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getReferenceByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                id: components["parameters"]["ResourceID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reference found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["ReferenceResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
 }
