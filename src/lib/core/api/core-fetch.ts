@@ -11,7 +11,6 @@
  * Conformance:
  *   - rule .claude/rules/api-contract.md   (envelope unwrapped once, no hand-rolled fetch)
  *   - rule .claude/rules/observability.md  (requestId forwarded as x-request-id)
- *   - rule .claude/rules/auth-and-session.md (no tokens in the request from this layer)
  *   - rule .claude/rules/security.md       (no tokens reach the browser)
  */
 import { ApiError } from './error.js';

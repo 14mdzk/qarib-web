@@ -44,7 +44,7 @@ export const publicEnvSchema = z.object({
 	PUBLIC_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
 	/** Human-readable app name (used in page titles, meta). */
-	PUBLIC_APP_NAME: z.string().min(1).default('surfaceit')
+	PUBLIC_APP_NAME: z.string().min(1).default('Qarib')
 });
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
@@ -61,14 +61,6 @@ export const serverEnvSchema = z.object({
 	UPSTREAM_API_URL: z
 		.string({ error: 'UPSTREAM_API_URL is required' })
 		.url('UPSTREAM_API_URL must be a valid absolute URL'),
-
-	/**
-	 * Secret used to sign session cookies. Must be at least 32 characters.
-	 * Generate with: openssl rand -hex 32
-	 */
-	SESSION_SECRET: z
-		.string({ error: 'SESSION_SECRET is required' })
-		.min(32, 'SESSION_SECRET must be at least 32 characters'),
 
 	/** Node runtime environment. Controls HSTS, debug logging, etc. */
 	NODE_ENV: z.enum(['development', 'test', 'production']).default('development')

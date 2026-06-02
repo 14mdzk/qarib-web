@@ -21,7 +21,7 @@ describe('publicEnvSchema', () => {
 		const result = publicEnvSchema.parse({});
 		expect(result.PUBLIC_API_URL).toBe('/api/upstream');
 		expect(result.PUBLIC_LOG_LEVEL).toBe('info');
-		expect(result.PUBLIC_APP_NAME).toBe('surfaceit');
+		expect(result.PUBLIC_APP_NAME).toBe('Qarib');
 	});
 
 	it('applies defaults when fields are undefined', () => {
@@ -32,7 +32,7 @@ describe('publicEnvSchema', () => {
 		});
 		expect(result.PUBLIC_API_URL).toBe('/api/upstream');
 		expect(result.PUBLIC_LOG_LEVEL).toBe('info');
-		expect(result.PUBLIC_APP_NAME).toBe('surfaceit');
+		expect(result.PUBLIC_APP_NAME).toBe('Qarib');
 	});
 
 	it('accepts a valid absolute-path API URL', () => {
@@ -76,14 +76,12 @@ describe('publicEnvSchema', () => {
 
 describe('serverEnvSchema', () => {
 	const validServerEnv = {
-		UPSTREAM_API_URL: 'https://goscratch.example.com',
-		SESSION_SECRET: 'a'.repeat(32)
+		UPSTREAM_API_URL: 'https://goscratch.example.com'
 	};
 
 	it('parses a valid server environment', () => {
 		const result = serverEnvSchema.parse(validServerEnv);
 		expect(result.UPSTREAM_API_URL).toBe('https://goscratch.example.com');
-		expect(result.SESSION_SECRET).toBe('a'.repeat(32));
 		expect(result.NODE_ENV).toBe('development'); // default
 	});
 
@@ -104,32 +102,13 @@ describe('serverEnvSchema', () => {
 	});
 
 	it('throws when UPSTREAM_API_URL is missing', () => {
-		expect(() =>
-			serverEnvSchema.parse({ SESSION_SECRET: validServerEnv.SESSION_SECRET })
-		).toThrow();
+		expect(() => serverEnvSchema.parse({})).toThrow();
 	});
 
 	it('throws when UPSTREAM_API_URL is not a valid URL', () => {
 		expect(() =>
 			serverEnvSchema.parse({ ...validServerEnv, UPSTREAM_API_URL: 'not-a-url' })
 		).toThrow();
-	});
-
-	it('throws when SESSION_SECRET is missing', () => {
-		expect(() =>
-			serverEnvSchema.parse({ UPSTREAM_API_URL: validServerEnv.UPSTREAM_API_URL })
-		).toThrow();
-	});
-
-	it('throws when SESSION_SECRET is shorter than 32 characters', () => {
-		expect(() =>
-			serverEnvSchema.parse({ ...validServerEnv, SESSION_SECRET: 'tooshort' })
-		).toThrow();
-	});
-
-	it('accepts a SESSION_SECRET of exactly 32 characters', () => {
-		const result = serverEnvSchema.parse({ ...validServerEnv, SESSION_SECRET: 'x'.repeat(32) });
-		expect(result.SESSION_SECRET).toHaveLength(32);
 	});
 });
 
@@ -142,7 +121,7 @@ describe('parsePublicEnv', () => {
 		const cfg = parsePublicEnv({});
 		expect(cfg.PUBLIC_API_URL).toBe('/api/upstream');
 		expect(cfg.PUBLIC_LOG_LEVEL).toBe('info');
-		expect(cfg.PUBLIC_APP_NAME).toBe('surfaceit');
+		expect(cfg.PUBLIC_APP_NAME).toBe('Qarib');
 	});
 
 	it('throws a descriptive error for invalid input', () => {
@@ -158,8 +137,7 @@ describe('parsePublicEnv', () => {
 
 describe('parseServerEnv', () => {
 	const validRaw = {
-		UPSTREAM_API_URL: 'https://goscratch.example.com',
-		SESSION_SECRET: 'b'.repeat(32)
+		UPSTREAM_API_URL: 'https://goscratch.example.com'
 	};
 
 	it('returns typed config with derived isProd flag', () => {
@@ -174,14 +152,10 @@ describe('parseServerEnv', () => {
 	});
 
 	it('throws a descriptive error naming the offending key', () => {
-		expect(() => parseServerEnv({ SESSION_SECRET: 'short' })).toThrowError(
-			/\[config\] Invalid server environment/
-		);
+		expect(() => parseServerEnv({})).toThrowError(/\[config\] Invalid server environment/);
 	});
 
 	it('throws when UPSTREAM_API_URL is missing', () => {
-		expect(() => parseServerEnv({ SESSION_SECRET: validRaw.SESSION_SECRET })).toThrowError(
-			/\[config\] Invalid server environment/
-		);
+		expect(() => parseServerEnv({})).toThrowError(/\[config\] Invalid server environment/);
 	});
 });

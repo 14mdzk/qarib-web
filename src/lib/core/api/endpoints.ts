@@ -7,21 +7,12 @@
  * Conformance:
  *   - rule .claude/rules/api-contract.md   (registry is the single source of truth)
  *   - rule .claude/rules/security.md       (no inline URL strings outside this file)
- *   - rule .claude/rules/auth-and-session.md (all upstream calls go through BFF)
  *
  * Conventions:
- *   - Key format: `<domain>.<action>` (e.g. `'auth.session'`, `'camera.list'`).
+ *   - Key format: `<domain>.<action>` (e.g. `'events.nearby'`).
  *   - `path` builders return the BFF-relative path (`/api/upstream/…`).
- *     The BFF proxy injects the Authorization header server-side.
  *   - Add Zod parsers in `parsers/<name>.ts` for endpoints with a history of
  *     contract violations or stricter typing needs (see api-contract rule).
- *
- * Auth lifecycle exception (ADR 0008):
- *   `auth.login`, `auth.logout`, and `auth.refresh` are declared in the
- *   registry for type derivation and catalog completeness. However, they are
- *   called directly via server-side fetch in `core/auth/**` and
- *   `routes/(auth)/**` — NOT through `api()`. See ADR 0008 for rationale.
- *   Do not call `api('auth.login', …)` etc. from client or load functions.
  */
 import type { paths } from '$generated/upstream';
 
