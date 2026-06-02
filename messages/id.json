@@ -18,5 +18,13 @@
 	"back_button_label": "Kembali",
 	"nav_search_placeholder": "Cari kajian, ustadz…",
 	"nav_search_open": "Buka pencarian",
-	"error_back_home": "Kembali ke beranda"
+	"error_back_home": "Kembali ke beranda",
+	"relative_today": "Hari ini, {time}",
+	"relative_tomorrow": "Besok, {time}",
+	"prayer_subuh": "Ba'da Subuh",
+	"prayer_dzuhr": "Ba'da Dzuhur",
+	"prayer_asr": "Ba'da Ashar",
+	"prayer_maghrib": "Ba'da Maghrib",
+	"prayer_isha": "Ba'da Isya",
+	"prayer_dhuha": "Waktu Dhuha"
 }
