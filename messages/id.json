@@ -15,5 +15,8 @@
 	"realtime_reconnecting": "Menyambung ulang… ({attempt} dari {max})",
 	"realtime_failed_banner": "Pembaruan langsung gagal tersambung. Muat ulang halaman untuk mencoba lagi.",
 	"realtime_parse_error": "Sebuah pesan pembaruan langsung tidak dapat diproses.",
-	"back_button_label": "Kembali"
+	"back_button_label": "Kembali",
+	"nav_search_placeholder": "Cari kajian, ustadz…",
+	"nav_search_open": "Buka pencarian",
+	"error_back_home": "Kembali ke beranda"
 }
