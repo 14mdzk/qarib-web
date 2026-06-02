@@ -51,7 +51,7 @@ export class ApiError extends Error {
  * `api_error_<reason>`.
  *
  * Domain services look up this table when converting an `ApiError`
- * into user-visible copy. Keep keys consistent with `messages/en.json`.
+ * into user-visible copy. Keep keys consistent with `messages/id.json`.
  * Unknown codes fall through to `'api_error_generic'`.
  */
 export const API_ERROR_I18N_KEYS: Record<string, string> = {
