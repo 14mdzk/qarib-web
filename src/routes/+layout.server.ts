@@ -7,6 +7,7 @@
  */
 import type { LayoutServerLoad } from './$types';
 
+// locale + requestId are consumed by child routes and error display, not by this layout directly.
 export const load: LayoutServerLoad = ({ locals }) => ({
 	locale: locals.locale,
 	requestId: locals.requestId
