@@ -1,67 +1,90 @@
-# Charter — ${PROJECT_NAME}
+# Charter — Qarib (web)
 
 ## What this is
 
-A SvelteKit + TypeScript frontend boilerplate engineered as a **long-lived starting point**, not a single product. Every product fork inherits a working auth surface, a typed API client, a real-time pipeline, an i18n harness, a testing stack, and a documented design discipline.
+Qarib's public **web app**: a no-account, map-first way to discover **kajian**
+(Islamic study sessions) happening nearby — and the **masjid** (places),
+**asatidz** (ustadz), and **tema** (subjects) behind them. It is the first
+surface real users meet. Native mobile comes later.
 
-The first concrete consumer is the `goscratch` backend (hexagonal Go). The boilerplate is **backend-shape-agnostic** — anything that exposes an OpenAPI spec and JSON envelopes should plug in.
+This repository was forked from the **surfaceit** SvelteKit boilerplate (which
+stays upstream at `14mdzk/surfaceit`). **From this point on, this repo is the
+Qarib product**, not a reusable starting point — the boilerplate's "do not
+become a product" non-goal is intentionally retired here (see ADR 0009-0012).
+`${PROJECT_NAME}` is replaced by `Qarib` throughout.
+
+It consumes **qarib-api** (Go, hexagonal) over **public, read-only** HTTP.
+Content is authored elsewhere — the Laravel/Filament CMS is the single source of
+truth (qarib-api ADR-008). Qarib-web only reads and presents; it never writes.
 
 ## Why this exists
 
-Built from the lessons of `flowcount/frontend`, where ad-hoc choices accreted into:
+The product promise is on the landing itself: *"Kajian terdekat, dalam satu
+ketukan — gratis, tanpa akun, tanpa unduh."* The wedge is a **browser app a
+visitor can open and use immediately**, with native apps marketed as "Segera"
+(later). Shipping web-first lets users get to know Qarib now instead of waiting
+on a mobile build.
 
-- module-singleton stores that block testing and SSR scoping
-- a god-object dashboard store with reactivity hacks
-- client-only auth with refresh tokens in `localStorage`
-- hand-written Zod schemas drifting from backend contracts
-- inline Indonesian copy with no i18n path
-- zero tests, zero CI, two parallel auth surfaces (one unused)
-
-`${PROJECT_NAME}` exists so the next product never starts from there. The cost of getting the foundation right once is paid back the first time we fork.
+The data already exists (qarib-api is built and verified). What was missing is
+how we **present** it. This app is that presentation layer.
 
 ## Goals
 
-1. **SSR-first** auth and data flow. No blank flashes, no localStorage bearer tokens.
-2. **Codegen-first** API contracts. Hand-written schemas only when codegen genuinely cannot express the shape.
-3. **Context-DI everywhere.** No module singletons for stateful services.
-4. **Reactive collections done right.** `SvelteMap` / `SvelteSet` over manual `updateCounter++` hacks.
-5. **Domain isolation.** One folder per backend module — schema, service, queries, store factory, components — no cross-domain imports.
-6. **i18n on day one.** English-only catalog, but every string flows through the i18n layer.
-7. **Tests are a default, not a stretch goal.** Vitest + Playwright + MSW wired before the first feature ships.
-8. **Docs are part of the contract.** A change without a doc update is incomplete.
+1. **Public, no-account browse.** Every user-facing flow works with zero login.
+   No session, no per-user state in v1.
+2. **Map-first discovery.** The core experience is "see kajian pins near me,"
+   backed by `qarib-api`'s spatial `/events/nearby` feed.
+3. **Bahasa Indonesia first.** Single `id` locale, but every string flows
+   through the i18n layer so a second locale is later a JSON drop, not a refactor.
+4. **SSR + a thin read-through BFF.** SvelteKit server routes proxy `qarib-api`
+   so the browser never talks to upstream directly; tokens are irrelevant (reads
+   are public) but caching, header hygiene, and request-id still flow here.
+5. **Codegen-typed contract.** Types come from `qarib-api`'s OpenAPI spec via
+   `openapi-typescript`; hand-written Zod only at trust boundaries.
+6. **Design fidelity.** The warm landing identity (Plus Jakarta Sans + Fraunces,
+   orange + cream paper, the locked tokens) is the single visual lever. Ported
+   CMS components get reskinned to these tokens, never their old styling.
+7. **Incremental, shippable phases.** Each roadmap phase ends in a merged PR with
+   green gates — never a long no-ship stretch.
 
-## Non-goals
+## Non-goals (v1)
 
-- A design system marketplace. We ship our tokens; downstream products fork them.
-- A drop-in admin panel generator. We ship patterns, not screens.
-- Backend code. The boilerplate consumes APIs; it does not implement them.
-- Mobile-native. We are responsive web. Add Capacitor or Tauri later if needed.
-- A microfrontend shell. Monorepo split or microfrontends are explicit later decisions, not assumed.
+- **User accounts / auth.** No login, signup, favorites, or "follow an ustadz."
+  The marketed promise is "tanpa akun." Revisit post-MVP. (ADR 0009)
+- **Content authoring / admin.** That is the CMS (Filament). Qarib-web is read-only.
+- **Native mobile.** Responsive web only. Capacitor/Tauri is a later decision.
+- **Multi-locale.** `id` only for v1; en/ar deferred. (ADR 0010)
+- **Realtime / SSE.** Kajian schedules are not live-tickers; plain SSR + cache.
+- **Write paths of any kind** (attendance, reviews, submissions).
 
 ## Success criteria
 
-`${PROJECT_NAME}` succeeds when:
+Qarib-web v1 succeeds when a visitor can, **without an account**:
 
-1. A new product fork can authenticate, list a paginated resource, mutate it, and stream a real-time update **without writing infrastructure code** — only domain code.
-2. A new engineer can read `docs/architecture/overview.md` plus one domain folder and ship a feature within a day.
-3. A green CI run guarantees: typecheck, lint, unit tests, e2e smoke, build, security headers verified.
-4. No singleton stateful service exists in `src/lib/core/**`.
-5. No hand-rolled fetch calls exist outside `src/lib/core/api/**`.
-6. No user-facing English string lives outside the i18n catalog.
-7. Lighthouse a11y ≥ 95 on the reference shell.
-8. Bundle: initial JS for the reference shell route ≤ 180 KB gzipped.
+1. Land on a warm, on-brand page that explains Qarib in seconds.
+2. Open the map and see kajian happening near them (pins, tiers by urgency/distance).
+3. Open a kajian → see time, masjid, ustadz, subject.
+4. Open a masjid → see its kajian calendar; open an ustadz → see their profile and
+   active kajian; browse by tema.
+5. Do all of the above in Bahasa, on a phone-sized screen, with no blank flashes (SSR).
+6. Lighthouse a11y ≥ 95 on the landing and the map shells; bundle within budget.
 
-## Out of scope (for now)
+## Architecture at a glance
 
-- Multi-tenant routing
-- Feature-flag service integration (interface-only stub may exist)
-- Analytics/telemetry pipeline beyond log forwarding
-- Service worker / offline mode
+```
+browser ──▶ qarib-web (SvelteKit SSR + read-through BFF) ──▶ qarib-api (Go, public reads)
+                                                              ▲
+                              Laravel/Filament CMS ───────────┘  (authors content; not in the user path)
+```
+
+- `src/lib/core/*` — framework primitives (api registry, query, i18n, config, logger). Reused as-is.
+- `src/lib/domains/<events|places|asatidz|subjects|regions>/*` — one slice per qarib-api module.
+- `src/lib/shared/{primitives,composites}` — forked shadcn primitives + Qarib composites (MapView, EventCard, Paginator…).
+- `src/routes/(app)/*` — public, unguarded browse routes. `src/routes/api/upstream/*` — the BFF proxy.
 
 ## Glossary
 
-- **Domain** — a bounded slice that mirrors a backend module, e.g. `domains/user`, `domains/billing`.
-- **Core** — framework primitives with zero domain knowledge: api, auth, realtime, query, i18n, logger, config.
-- **Shared** — cross-domain UI and utilities: primitives, composites, hooks, helpers.
-- **Server-only** — code under `src/lib/server/**` or `*.server.ts` that must never bundle into the client.
-- **BFF endpoint** — a route under `src/routes/api/**` that the frontend calls; it proxies to the upstream backend with the cookie-session translated to a bearer token.
+- **Kajian** — an Islamic study session. In qarib-api, an `Event` (series) materializes into `EventRecurring` occurrences; clients mostly consume occurrences.
+- **Masjid / Place** — venue. **Asatidz / Ustadz** — the teacher (`asatidz` endpoints). **Tema / Subject** — topic (Aqidah, Fiqh, Tafsir, Hadits…).
+- **BFF** — `src/routes/api/upstream/**`: same-origin proxy to qarib-api. In v1 it forwards public reads (no Bearer), strips client headers, adds request-id, sets cache headers.
+- **Core / Domain / Shared / Server-only** — see `docs/architecture/overview.md`.

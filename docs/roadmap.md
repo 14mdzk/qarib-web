@@ -1,89 +1,126 @@
-# Roadmap — ${PROJECT_NAME}
+# Roadmap — Qarib (web)
 
-Phased delivery. Each phase ends with a tagged commit and an updated `CHANGELOG.md` (introduced in Phase 1).
+Vertical-slice delivery. Each phase ends in a **merged PR with green gates**
+(`check` / `lint` / `test` / `build`) and a `CHANGELOG.md` entry. App-shell
+first, then each domain slots into it.
 
-## Phase 0 — Foundation (no production code)
+Two tiers of detail, on purpose:
 
-Goal: turn the empty SvelteKit skeleton into a documented, governed repo.
+- **This roadmap** = every phase decomposed into its task checklist + intent +
+  exit criteria — enough to grasp *what*, *why*, and *roughly how* across the
+  whole MVP.
+- **`docs/plans/<phase>.md`** = the exhaustive step-by-step (files, functions,
+  tests, order) for the phase about to be built, written **just-in-time** via the
+  writing-plans skill so it is accurate when executed — not stale on arrival.
+  Each task there carries **Intent · How · Action · Done-when**.
 
-- [x] Root `CLAUDE.md`
-- [x] `docs/` archive (charter, roadmap, architecture, decisions, wiki, guides)
-- [x] `.claude/rules/` (15 always-apply rules)
-- [x] `.claude/agents/` adapted personas + specialist roster
-- [x] `.claude/CLAUDE.md` minor index
-- [x] First ADRs (0001–0005) accepted
+Dependencies: **A** unblocks everything. **B** (landing) is independent of the
+app shell. **C** (events/map) is the core and is reused by **D/E/F**.
 
-Exit criteria: a fresh agent can read the docs and act safely without inventing conventions.
+---
 
-## Phase 1 — Skeleton wiring
+## Phase 0 — Foundation primitives ✅ (landed)
 
-Goal: project boots, builds, tests run green on an empty shell.
+Already merged (qarib-web #1, qarib-api #30):
 
-- [x] Add deps: Tailwind v4, Zod, `@tanstack/svelte-query`, Paraglide JS, pino, `openapi-typescript`, msw, vitest, `@playwright/test`, `@sveltejs/adapter-node`.
-- [x] Folder skeleton under `src/lib/{core,shared,domains,server,generated}` and `src/routes/{(auth),(app),api}`.
-- [x] SSR enabled. `hooks.server.ts` with auth + CSP + request-id + `handleError`.
-- [x] Global `+error.svelte`.
-- [x] ESLint flat config, Prettier, lefthook pre-commit.
-- [x] CI: `bun install`, `check`, `lint`, `test`, `build`.
+- [x] Design tokens + semantic dark layer + self-hosted fonts (`src/app.css`).
+- [x] OpenAPI codegen wired against the real qarib-api spec → `src/lib/generated/upstream.ts`; `auth.session` repointed to `/users/me`.
+- [x] qarib-api spec corrections (nullable localized strings, error enum, status description).
 
-Exit criteria: `bun run dev` shows an empty layout with i18n locale switch wired; `bun run test` (Vitest) green. **Met** — see CHANGELOG `[Unreleased] Phase 1`.
+---
 
-## Phase 2 — Core primitives
+## Phase A — Fork-time foundation + App Shell
 
-Goal: every primitive a domain will need is in `src/lib/core/`.
+**Goal:** make this repo *Qarib* (not the boilerplate), remove the surfaces v1
+does not use, and build the chrome every browse page slots into — so later
+phases add content, never re-invent the frame.
 
-- `core/api` — endpoint registry v2 (request *and* response types), `core-fetch`, `ApiError`, refresh in BFF.
-- `core/auth` — context-scoped session, cookie-session helpers, refresh rotation server-side.
-- `core/realtime` — `SSEClient` adapted to `SvelteMap` and context-DI.
-- `core/query` — svelte-query client + `defineQuery` / `defineMutation` tied to endpoint registry.
-- `core/config` — Zod-validated env loader (public/private split).
-- `core/logger` — pino server, leveled console client.
-- `core/i18n` — Paraglide setup with English catalog only.
+- [ ] **Docs / identity**: this charter + roadmap + ADRs 0009-0012; replace `${PROJECT_NAME}` → `Qarib` across `docs/`, `CLAUDE.md`, `package.json`.
+- [ ] **Strip the unused auth surface** (ADR 0009): remove `(auth)/login`, `(auth)/logout`, the session guard in `(app)/+layout.server.ts`, auth e2e specs; simplify `hooks.server.ts` (drop session resolution + auth-CSRF; keep CSP, request-id, `handleError`); simplify the BFF (`api/upstream/[...path]`) to a **public read-through** proxy (forward GET, strip client cookies, add request-id + cache headers, no Bearer). Supersede `auth-and-session.md` scope via ADR.
+- [ ] **Locale → `id`** (ADR 0010): default locale `id`, `messages/id.json`, drop the en switcher (keep the i18n layer + facade).
+- [ ] **App shell** (`(app)/+layout.svelte`): two header modes — `MTopBar` (logo + search) for the map home, `MTopBarBack` (back + title + overflow) for inner pages; route decides the mode. Responsive nav. Shared `loading` / `error` / `empty` states.
+- [ ] **First primitives** (forked shadcn per ADR 0002, under `shared/primitives`): `Button`, `IconButton`, `Card`, `Badge`/`Pill`, `Skeleton`; shell pieces `Header`, `BackButton`.
+- [ ] **Port shared utils from qarib-cms** (reskinned to tokens): `date`/hijri, `names` (Arabic), `prayer`; base Zod schemas. (`cn` already present.)
+- [ ] **Tests**: unit for header-mode logic + primitives; e2e smoke (shell renders, header switches by route, `id` copy, light/dark).
 
-Exit criteria: a stub domain can authenticate, fetch, mutate, and receive an SSE event using only `core/*`.
+**Exit:** a blank `(app)` route renders the correct header per route, in Bahasa,
+light/dark, responsive; the auth surface is gone; all gates green.
+Detailed plan: `docs/plans/phase-a-foundation.md`.
 
-## Phase 3 — Reusable shells
+## Phase B — Landing
 
-Goal: a developer copies one folder and gets a feature.
+**Goal:** the warm "get to know us" surface — the approved **A+C fused hero**.
 
-- `shared/primitives` — shadcn-svelte init, hand-forked, renamed `components/ui` → `components/primitives`.
-- `shared/composites` — paginator, data-table (TanStack), filter-bar, error-state, empty-state.
-- `domains/_template` — copy-pasteable domain pattern (schema, service, queries, store factory, components).
-- `routes/(auth)/login` — working SSR login flow.
-- `routes/(app)` — session-guarded shell with sidebar, header, locale switch.
-- `routes/api` — BFF proxy (cookie → bearer).
+- [ ] Route `/` with **landing chrome** (marketing nav: logo + *Cara kerja* / *Fitur* / *Buka Qarib*) — distinct from the app shell.
+- [ ] Translate `landing.jsx` → Svelte: fused **Editorial × Map-as-hero** hero (editorial copy over a map with pulsing pins; a static map snapshot is fine for v1), Problem section, Features (3 cards), Footer CTA (**no trust badges**), footer with dua.
+- [ ] Fraunces italic emphasis; Arabic accent (`قريب`) per the locked design.
+- [ ] Wire *Buka Qarib* → `/peta`.
+- [ ] All copy through i18n (`id`).
+- [ ] **Tests**: e2e (landing renders, CTA routes to `/peta`); a11y ≥ 95.
 
-Exit criteria: copying `_template` to `domains/example` and adding a route gives a working CRUD page in under an hour.
+**Exit:** `/` matches the approved landing on the locked tokens, light/dark,
+responsive, a11y ≥ 95.
 
-## Phase 4 — Codegen + DX
+## Phase C — Events / map  *(the core hook)*
 
-Goal: backend contract changes flow into the frontend automatically.
+**Goal:** the actual product — nearby kajian on a map, plus list and detail.
 
-- Wire `openapi-typescript` against `goscratch` OpenAPI; placeholder spec until then.
-- Generator scripts: `bun run new:domain <name>`, `bun run new:route <path>`.
-- ADR pipeline: PR template that prompts "does this need an ADR?".
-- README quickstart, architecture diagram (Mermaid), screenshots.
-- `docs/guides/*` filled out.
+- [ ] `domains/events`: **schema** (occurrence `EventRecurring` + `EventSeries`, from generated types + Zod at boundaries), **service** (typed client: `/events`, `/events/nearby`, `/events/:id`, `/events/series/:slug` (+`/upcoming`, `/recurrings`)), **queries** (svelte-query keys + **cursor** pagination — composite cursors for nearby), **store** (map filters + geolocation + selected pin, context-DI runes).
+- [ ] **`MapView` composite**: Leaflet **client-only island** + Stadia/Stamen styled tiles (key via env), pins with **tier styling** (port `pinTierService` from cms), user-location dot, bottom-sheet/callout.
+- [ ] Route **`/peta`** (map home, `MTopBar`, no back): map ↔ list toggle, date strip, subject chips, nearby feed (`lat`+`lng` **or** `region_id`), geolocation permission + region fallback.
+- [ ] Route **`/kajian/[slug]`** (detail, `MTopBarBack`): time + prayer anchor, masjid, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
+- [ ] **Tests**: service/store/schema unit (MSW), e2e (open `/peta` → pins → open a kajian).
 
-Exit criteria: a backend rename triggers a typed compile error in the frontend within one `bun run codegen` cycle.
+**Exit:** a visitor opens `/peta`, sees nearby kajian pins, filters by date/tema,
+and opens a kajian detail — all SSR, all public.
 
-## Phase 5 — Hardening
+## Phase D — Places (masjid)
 
-Goal: the boilerplate is forkable for production.
+**Goal:** venue detail + the masjid's kajian calendar.
 
-- Lighthouse a11y ≥ 95.
-- CSP / HSTS / Referrer-Policy / Permissions-Policy headers verified by integration test.
-- Sentry-style error pipeline plug point.
-- Rate-limit-aware fetch retry policy.
-- Observability sample (request ID through hooks → BFF → upstream → logger).
-- Performance budget enforced in CI (bundle size guard).
+- [ ] `domains/places`: schema/service/queries (`/places`, `/places/:id`).
+- [ ] Route **`/masjid/[id]`** (`MTopBarBack`): venue info, mini-map, **upcoming kajian** (reuse the events service + `EventCard`), calendar view.
+- [ ] **Tests**: service unit + e2e (open masjid from a kajian/map → calendar).
 
-Exit criteria: forking the repo and renaming `${PROJECT_NAME}` produces a deployable shell.
+**Exit:** from a kajian or a map pin, a user opens the masjid and sees its kajian calendar.
+
+## Phase E — Ustadz (asatidz)
+
+**Goal:** teacher profile + their active kajian.
+
+- [ ] `domains/asatidz`: schema/service/queries (`/asatidzs`, `/asatidzs/:id`).
+- [ ] Route **`/ustadz/[id]`**: profile (name, alias, bio, specialization), active kajian (events filtered by `asatidz_id`).
+- [ ] **Tests**: service unit + e2e.
+
+**Exit:** open an ustadz → profile + the kajian they teach.
+
+## Phase F — Subjects (tema) + search
+
+**Goal:** browse by topic and find things.
+
+- [ ] `domains/subjects`: schema/service/queries (`/subjects`, `/subjects/:id`).
+- [ ] Route **`/tema/[id]`**: subject + its kajian (events by `subject_id`).
+- [ ] Route **`/cari`**: search across kajian / masjid / ustadz / tema (api filters where available).
+- [ ] **Tests**: service unit + e2e (search returns + navigates).
+
+**Exit:** browse by tema and search both work end-to-end.
+
+---
+
+## Per-phase definition of done
+
+Every phase PR satisfies `.claude/rules/definition-of-done.md`: layer hygiene,
+no module-singleton stores, no hand-rolled fetch outside `core/api`, no
+user-facing string outside i18n, tests (unit + e2e where it touches a critical
+flow), green gates, docs/ADR updated when a constrained surface changes.
+
+## Workflow
+
+Per phase: feature branch + **git worktree**, file-isolated dispatched agents,
+**independent `reviewer`** (+ `devils-advocate` on design/architecture-affecting
+PRs), PR with the completed task checklist, then merge. See
+`.claude/rules/agent-dispatch.md`.
 
 ## Out of scope until later
 
-- SSR streaming
-- Multi-tenant tenant resolver
-- Feature flags
-- A11y testing automation beyond Lighthouse
-- Visual regression suite
+User accounts/favorites/follow · native mobile · multi-locale (en/ar) · realtime/SSE · any write path · content authoring (CMS owns it).
