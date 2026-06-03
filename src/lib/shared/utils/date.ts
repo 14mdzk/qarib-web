@@ -10,11 +10,10 @@ export function formatDate(dateStr: string): string {
 }
 
 export function formatTime(dateStr: string): string {
-	return new Intl.DateTimeFormat('id-ID', {
-		hour: '2-digit',
-		minute: '2-digit',
-		hour12: false
-	}).format(new Date(dateStr));
+	const d = new Date(dateStr);
+	const hh = String(d.getHours()).padStart(2, '0');
+	const mm = String(d.getMinutes()).padStart(2, '0');
+	return `${hh}:${mm}`;
 }
 
 export function formatDistance(km: number): string {

@@ -10,8 +10,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
-import { api } from './core-fetch.js';
+import { api, type Paginated } from './core-fetch.js';
 import { ApiError } from './error.js';
+import type { components } from '$generated/upstream';
+
+type EventRecurringResponse = components['schemas']['EventRecurringResponse'];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -224,6 +227,41 @@ describe('api() — SSR guard', () => {
 				globalThis.window = originalWindow;
 			}
 		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Paginated envelope branch
+// ---------------------------------------------------------------------------
+
+describe('api() — paginated envelope', () => {
+	it('returns { data, pagination } when the envelope has a pagination field', async () => {
+		server.use(
+			http.get('http://localhost/api/upstream/events/nearby', () =>
+				HttpResponse.json({
+					success: true,
+					data: [{ id: 1, date_start: '2026-06-10T18:00:00Z' }],
+					pagination: { next_cursor: 'cursor-xyz', has_more: true, has_prev: false }
+				})
+			)
+		);
+
+		const result = await api('events.nearby', {}, undefined, baseOpts());
+		const r = result as Paginated<EventRecurringResponse[]>;
+
+		expect(r).toHaveProperty('data');
+		expect(r).toHaveProperty('pagination');
+		expect(r.data).toHaveLength(1);
+		expect(r.pagination.next_cursor).toBe('cursor-xyz');
+		expect(r.pagination.has_more).toBe(true);
+	});
+
+	it('returns bare data when the envelope has no pagination field', async () => {
+		// auth.session has no pagination — stays as bare data object
+		const result = await api('auth.session', undefined, undefined, baseOpts());
+
+		expect(result).not.toHaveProperty('pagination');
+		expect(result).toHaveProperty('user');
 	});
 });
 

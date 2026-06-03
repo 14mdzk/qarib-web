@@ -6,7 +6,7 @@
  *
  * Conformance: rule .claude/rules/architecture.md (export through index).
  */
-export { api, type ApiCallOptions } from './core-fetch.js';
+export { api, type ApiCallOptions, type Paginated, type PaginationMeta } from './core-fetch.js';
 export { ApiError, apiErrorI18nKey, type ApiErrorInit, API_ERROR_I18N_KEYS } from './error.js';
 export {
 	Endpoints,

@@ -7,6 +7,9 @@
  *   2. Calls `fetch` with the correct method, headers, and body.
  *   3. Unwraps the `{ success, data }` / `{ success, error }` envelope exactly
  *      once. Consumers receive `data` directly or catch an `ApiError`.
+ *   4. When the success envelope carries a top-level `pagination` field,
+ *      returns `{ data, pagination }` instead of bare `data` so callers can
+ *      drive cursor-based pagination. Non-paginated endpoints are unchanged.
  *
  * Conformance:
  *   - rule .claude/rules/api-contract.md   (envelope unwrapped once, no hand-rolled fetch)
@@ -23,12 +26,54 @@ import {
 } from './endpoints.js';
 
 // ---------------------------------------------------------------------------
+// Paginated response wrapper
+// ---------------------------------------------------------------------------
+
+/**
+ * Returned by `api()` for endpoints whose upstream envelope carries a
+ * `pagination` field alongside `data`.
+ *
+ * The real API envelope is single-level:
+ *   `{ success: true, data: T[], pagination: { next_cursor, prev_cursor, has_more, has_prev, total? } }`
+ *
+ * `api()` unwraps `success` and re-packages as `{ data: T[], pagination }` so
+ * consumers can access both the items and the cursor metadata.
+ *
+ * Use `Paginated<EventRecurringResponse[]>` as the `Response` type param in
+ * `defineEndpoint` for any list endpoint that returns cursor pagination.
+ */
+export interface Paginated<T> {
+	data: T;
+	pagination: PaginationMeta;
+}
+
+/**
+ * Inline pagination meta — mirrors `components['schemas']['PaginationMeta']`
+ * without importing `$generated` into core.
+ *
+ * Drift risk: this is a hand-mirror with no codegen guard.  If the upstream
+ * schema adds, removes, or renames a field, this interface will not update
+ * automatically — the discrepancy won't be caught by the compiler.  When
+ * running `bun run codegen` after an upstream schema change, manually verify
+ * this interface still matches `components['schemas']['PaginationMeta']` in
+ * `src/lib/generated/upstream.ts`.
+ */
+export interface PaginationMeta {
+	next_cursor?: string | null;
+	prev_cursor?: string | null;
+	has_more?: boolean;
+	has_prev?: boolean;
+	total?: number | null;
+}
+
+// ---------------------------------------------------------------------------
 // Envelope shapes
 // ---------------------------------------------------------------------------
 
 interface SuccessEnvelope<T> {
 	success: true;
 	data: T;
+	pagination?: PaginationMeta;
 	message?: string;
 }
 
@@ -175,5 +220,23 @@ export async function api<K extends EndpointKey>(
 		});
 	}
 
-	return (typed as SuccessEnvelope<ResponseOf<K>>).data;
+	const success = typed as SuccessEnvelope<ResponseOf<K>>;
+
+	// When the envelope carries a `pagination` field the endpoint is a
+	// cursor-paginated list.  Return `{ data, pagination }` so callers can
+	// access the cursor metadata.  Endpoints without `pagination` return
+	// `data` directly, preserving the existing behaviour.
+	//
+	// Cast contract: `as ResponseOf<K>` is sound only because the registry
+	// declares `Paginated<T>` as `ResponseOf` for every endpoint whose
+	// upstream actually includes a `pagination` field.  If an endpoint is
+	// mistakenly typed as `Paginated<T>` but the upstream omits `pagination`,
+	// the cast still succeeds at compile time and the caller silently receives
+	// `{ data: …, pagination: undefined }` — the type is wrong at runtime with
+	// no compiler error.  Keep registry types and upstream contract in sync.
+	if (success.pagination !== undefined) {
+		return { data: success.data, pagination: success.pagination } as ResponseOf<K>;
+	}
+
+	return success.data;
 }
