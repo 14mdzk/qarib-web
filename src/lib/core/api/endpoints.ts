@@ -14,7 +14,30 @@
  *   - Add Zod parsers in `parsers/<name>.ts` for endpoints with a history of
  *     contract violations or stricter typing needs (see api-contract rule).
  */
-import type { paths } from '$generated/upstream';
+import type { paths, components } from '$generated/upstream';
+import type { Paginated } from './core-fetch.js';
+
+/** Shorthand for a single event occurrence from the generated schema. */
+type EventRecurringResponse = components['schemas']['EventRecurringResponse'];
+
+// ---------------------------------------------------------------------------
+// URL helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a query string from an args object, omitting keys whose value is
+ * `undefined` or `null`. Returns an empty string when the object is empty.
+ * Only used inside path builders in this file.
+ */
+function qs(params: Record<string, string | number | boolean | undefined | null>): string {
+	const pairs: string[] = [];
+	for (const [k, v] of Object.entries(params)) {
+		if (v !== undefined && v !== null) {
+			pairs.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
+		}
+	}
+	return pairs.length ? `?${pairs.join('&')}` : '';
+}
 
 // ---------------------------------------------------------------------------
 // Generic helpers
@@ -130,6 +153,140 @@ export const Endpoints = {
 	>({
 		method: 'POST',
 		path: () => '/api/upstream/auth/refresh'
+	}),
+
+	// ---------------------------------------------------------------------------
+	// Events domain
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Spatial event discovery — occurrences near a lat/lng or region.
+	 *
+	 * The real upstream envelope is single-level:
+	 *   `{ success, data: EventRecurringResponse[], pagination: { next_cursor, … } }`
+	 * `api()` detects the `pagination` field and returns `{ data, pagination }`
+	 * so callers can drive cursor-based paging. See `core-fetch.ts`.
+	 */
+	'events.nearby': defineEndpoint<
+		{
+			lat?: number;
+			lng?: number;
+			region_id?: string;
+			radius_km?: number;
+			subject_id?: string;
+			date_from?: string;
+			date_to?: string;
+			limit?: number;
+			cursor?: string;
+			expand?: string;
+		},
+		void,
+		Paginated<EventRecurringResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/nearby${qs({
+				lat: a.lat,
+				lng: a.lng,
+				region_id: a.region_id,
+				radius_km: a.radius_km,
+				subject_id: a.subject_id,
+				date_from: a.date_from,
+				date_to: a.date_to,
+				limit: a.limit,
+				cursor: a.cursor,
+				expand: a.expand
+			})}`
+	}),
+
+	/**
+	 * Discovery list of event occurrences with filter support.
+	 *
+	 * Cursor-paginated — see `events.nearby` for the envelope note.
+	 */
+	'events.list': defineEndpoint<
+		{
+			event_id?: string;
+			place_id?: string;
+			asatidz_id?: string;
+			subject_id?: string;
+			status?: number;
+			date_from?: string;
+			date_to?: string;
+			limit?: number;
+			cursor?: string;
+			expand?: string;
+		},
+		void,
+		Paginated<EventRecurringResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events${qs({
+				event_id: a.event_id,
+				place_id: a.place_id,
+				asatidz_id: a.asatidz_id,
+				subject_id: a.subject_id,
+				status: a.status,
+				date_from: a.date_from,
+				date_to: a.date_to,
+				limit: a.limit,
+				cursor: a.cursor,
+				expand: a.expand
+			})}`
+	}),
+
+	/**
+	 * Single event occurrence by integer ID.
+	 */
+	'events.get': defineEndpoint<
+		{ id: number; expand?: string },
+		void,
+		DataOf<Get200<'/events/{id}', 'get'>>
+	>({
+		method: 'GET',
+		path: (a) => `/api/upstream/events/${a.id}${qs({ expand: a.expand })}`
+	}),
+
+	/**
+	 * Event series template by slug.
+	 */
+	'events.series': defineEndpoint<
+		{ slug: string; expand?: string },
+		void,
+		DataOf<Get200<'/events/series/{slug}', 'get'>>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/series/${encodeURIComponent(a.slug)}${qs({ expand: a.expand })}`
+	}),
+
+	/**
+	 * Upcoming occurrences for a series (cursor-paginated).
+	 * See `events.nearby` for the envelope note.
+	 */
+	'events.seriesUpcoming': defineEndpoint<
+		{ slug: string; limit?: number; cursor?: string },
+		void,
+		Paginated<EventRecurringResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/series/${encodeURIComponent(a.slug)}/upcoming${qs({ limit: a.limit, cursor: a.cursor })}`
+	}),
+
+	/**
+	 * All occurrences for a series (past + future, cursor-paginated).
+	 * See `events.nearby` for the envelope note.
+	 */
+	'events.seriesRecurrings': defineEndpoint<
+		{ slug: string; limit?: number; cursor?: string },
+		void,
+		Paginated<EventRecurringResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/series/${encodeURIComponent(a.slug)}/recurrings${qs({ limit: a.limit, cursor: a.cursor })}`
 	})
 } as const;
 

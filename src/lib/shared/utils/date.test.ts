@@ -35,9 +35,12 @@ describe('formatDate', () => {
 });
 
 describe('formatTime', () => {
-	it('returns a 24-hour time string for id-ID', () => {
-		// id-ID Intl uses '.' as time separator (CLDR) — e.g. "14.30"
-		expect(formatTime('2026-05-15T14:30:00')).toMatch(/^14[.:]30$/);
+	it('returns a colon-separated HH:mm string', () => {
+		expect(formatTime('2026-05-15T14:30:00')).toMatch(/^\d{2}:\d{2}$/);
+	});
+
+	it('emits 18:00 for an 18:00 input', () => {
+		expect(formatTime('2026-05-15T18:00:00')).toBe('18:00');
 	});
 });
 
@@ -74,7 +77,7 @@ describe('getRelativeDateLabel', () => {
 		const dateStr = `${localDateStr(now)}T14:30:00`;
 		const result = getRelativeDateLabel(dateStr, now);
 		expect(result).toContain('Hari ini');
-		expect(result).toMatch(/14[.:]30/);
+		expect(result).toMatch(/14:30/);
 	});
 
 	it('returns "Besok, …" when the date is the next day', () => {
@@ -83,7 +86,7 @@ describe('getRelativeDateLabel', () => {
 		const dateStr = `${localDateStr(now, 1)}T09:00:00`;
 		const result = getRelativeDateLabel(dateStr, now);
 		expect(result).toContain('Besok');
-		expect(result).toMatch(/09[.:]00/);
+		expect(result).toMatch(/09:00/);
 	});
 
 	it('returns the Indonesian weekday name and time for a date 3 days out', () => {
@@ -95,6 +98,6 @@ describe('getRelativeDateLabel', () => {
 		);
 		const result = getRelativeDateLabel(dateStr, now);
 		expect(result).toContain(expected3DaysOut);
-		expect(result).toMatch(/09[.:]00/);
+		expect(result).toMatch(/09:00/);
 	});
 });
