@@ -303,6 +303,24 @@ export const Endpoints = {
 		method: 'GET',
 		path: (a) =>
 			`/api/upstream/events/series/by-id/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
+	}),
+
+	// ---------------------------------------------------------------------------
+	// Places domain
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Single place (masjid) by UUID.
+	 *
+	 * Used by the `/masjid/[id]` route. Public endpoint — no auth required.
+	 */
+	'places.get': defineEndpoint<
+		{ id: string; expand?: string },
+		void,
+		DataOf<Get200<'/places/{id}', 'get'>>
+	>({
+		method: 'GET',
+		path: (a) => `/api/upstream/places/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
 	})
 } as const;
 

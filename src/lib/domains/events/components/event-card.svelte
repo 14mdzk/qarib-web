@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { m, getLocale } from '$core/i18n';
 	import { Badge } from '$lib/shared/primitives';
 	import { formatTime, formatDistance } from '$lib/shared/utils/date.js';
@@ -31,6 +31,8 @@
 		occurrence.distance_km != null ? formatDistance(occurrence.distance_km) : null
 	);
 	const status = $derived(statusKey(occurrence.status));
+	// occurrences without a series event_id are not linkable
+	const eventId = $derived(occurrence.event_id ?? null);
 
 	function statusVariant(key: string): 'default' | 'accent' | 'soft' | 'ghost' {
 		if (key === 'ongoing') return 'accent';
@@ -54,52 +56,87 @@
 				return key;
 		}
 	}
-
-	// /kajian/[id] doesn't exist until C4 — use base + path to satisfy the
-	// svelte/no-navigation-without-resolve rule without calling resolve() which
-	// would fail type-check on a non-existent route. TODO(c4): switch to resolve().
-	const href = $derived(`${base}/kajian/${occurrence.id}`);
 </script>
 
-<!-- eslint-disable svelte/no-navigation-without-resolve -- /kajian/[id] lands in C4; base+path is correct. TODO(c4): switch to resolve(). -->
-<a
-	{href}
-	class="bg-surface-2 border-border hover:bg-surface-3 focus-visible:ring-ring block rounded-lg border p-4 shadow transition-colors focus-visible:ring-2 focus-visible:outline-none"
-	aria-label={title || m.event_card_aria_label()}
->
-	<div class="flex items-start justify-between gap-3">
-		<div class="min-w-0 flex-1">
-			<!-- Time + prayer anchor -->
-			{#if timeLabel}
-				<p class="text-content-3 mb-1 text-xs">
-					{timeLabel}{#if prayerLabel}&nbsp;&middot;&nbsp;{prayerLabel}{/if}
-				</p>
-			{/if}
+{#if eventId}
+	<a
+		href={resolve('/(app)/kajian/[id]', { id: eventId })}
+		class="bg-surface-2 border-border hover:bg-surface-3 focus-visible:ring-ring block rounded-lg border p-4 shadow transition-colors focus-visible:ring-2 focus-visible:outline-none"
+		aria-label={title || m.event_card_aria_label()}
+	>
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<!-- Time + prayer anchor -->
+				{#if timeLabel}
+					<p class="text-content-3 mb-1 text-xs">
+						{timeLabel}{#if prayerLabel}&nbsp;&middot;&nbsp;{prayerLabel}{/if}
+					</p>
+				{/if}
 
-			<!-- Title -->
-			<p class="text-content line-clamp-2 leading-snug font-medium">
-				{title || m.event_card_untitled()}
-			</p>
-
-			<!-- Masjid -->
-			{#if placeName}
-				<p class="text-content-3 mt-0.5 truncate text-sm">
-					{placeName}
+				<!-- Title -->
+				<p class="text-content line-clamp-2 leading-snug font-medium">
+					{title || m.event_card_untitled()}
 				</p>
-			{/if}
 
-			<!-- Distance -->
-			{#if distanceLabel}
-				<p class="text-content-3 mt-0.5 text-xs">
-					{distanceLabel}
-				</p>
-			{/if}
+				<!-- Masjid -->
+				{#if placeName}
+					<p class="text-content-3 mt-0.5 truncate text-sm">
+						{placeName}
+					</p>
+				{/if}
+
+				<!-- Distance -->
+				{#if distanceLabel}
+					<p class="text-content-3 mt-0.5 text-xs">
+						{distanceLabel}
+					</p>
+				{/if}
+			</div>
+
+			<!-- Status badge -->
+			<Badge variant={statusVariant(status)} class="shrink-0 text-xs">
+				{statusLabel(status)}
+			</Badge>
 		</div>
+	</a>
+{:else}
+	<div
+		class="bg-surface-2 border-border block rounded-lg border p-4 shadow"
+		aria-label={title || m.event_card_aria_label()}
+	>
+		<div class="flex items-start justify-between gap-3">
+			<div class="min-w-0 flex-1">
+				<!-- Time + prayer anchor -->
+				{#if timeLabel}
+					<p class="text-content-3 mb-1 text-xs">
+						{timeLabel}{#if prayerLabel}&nbsp;&middot;&nbsp;{prayerLabel}{/if}
+					</p>
+				{/if}
 
-		<!-- Status badge -->
-		<Badge variant={statusVariant(status)} class="shrink-0 text-xs">
-			{statusLabel(status)}
-		</Badge>
+				<!-- Title -->
+				<p class="text-content line-clamp-2 leading-snug font-medium">
+					{title || m.event_card_untitled()}
+				</p>
+
+				<!-- Masjid -->
+				{#if placeName}
+					<p class="text-content-3 mt-0.5 truncate text-sm">
+						{placeName}
+					</p>
+				{/if}
+
+				<!-- Distance -->
+				{#if distanceLabel}
+					<p class="text-content-3 mt-0.5 text-xs">
+						{distanceLabel}
+					</p>
+				{/if}
+			</div>
+
+			<!-- Status badge -->
+			<Badge variant={statusVariant(status)} class="shrink-0 text-xs">
+				{statusLabel(status)}
+			</Badge>
+		</div>
 	</div>
-</a>
-<!-- eslint-enable svelte/no-navigation-without-resolve -->
+{/if}
