@@ -1,6 +1,7 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"app_title": "Qarib",
+	"app_title_ar": "قريب",
 	"app_tagline": "Kajian terdekat, dalam satu ketukan.",
 	"error_generic_title": "Terjadi kesalahan",
 	"error_generic_body": "Terjadi kesalahan tak terduga. Coba lagi.",
@@ -26,5 +27,16 @@
 	"prayer_asr": "Ba'da Ashar",
 	"prayer_maghrib": "Ba'da Maghrib",
 	"prayer_isha": "Ba'da Isya",
-	"prayer_dhuha": "Waktu Dhuha"
+	"prayer_dhuha": "Waktu Dhuha",
+	"landing_nav_how": "Cara kerja",
+	"landing_nav_features": "Fitur",
+	"landing_nav_open": "Buka Qarib",
+	"landing_eyebrow": "Qarib · dekat denganmu",
+	"landing_hero_kajian": "Kajian",
+	"landing_hero_headline": "terdekat, dalam satu ketukan.",
+	"landing_hero_lede": "Temukan jadwal kajian di masjid sekitarmu — tanpa perlu bertanya, tanpa perlu akun. Klik, lihat, datangi.",
+	"landing_cta_primary": "Temukan kajian terdekat",
+	"landing_cta_secondary": "Lihat cara kerjanya",
+	"peta_soon_title": "Peta kajian",
+	"peta_soon_body": "Peta interaktif segera hadir."
 }
