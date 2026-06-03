@@ -50,6 +50,8 @@
 		/** Currently selected day-filter chip key. Defaults to 'today'. */
 		activeDay?: 'today' | 'tomorrow' | 'week';
 		onexpand?: () => void;
+		/** Fired when the chevron is tapped while in full mode to go back to peek. */
+		oncollapse?: () => void;
 		/** Fired when a day-filter chip is tapped. */
 		ondayselect?: (key: 'today' | 'tomorrow' | 'week') => void;
 		onselectevent?: (id: string | number) => void;
@@ -62,6 +64,7 @@
 		mode,
 		activeDay = 'today',
 		onexpand,
+		oncollapse,
 		ondayselect,
 		onselectevent,
 		onopenplace
@@ -103,37 +106,73 @@
 	}
 
 	// ---------------------------------------------------------------------------
-	// Day filter chips (full mode) — derive counts from events array
+	// Day filter chips (full mode) — derive counts from real local calendar dates
 	// ---------------------------------------------------------------------------
 
-	// Simple day buckets using the tier as proxy (real impl would inspect dates).
-	// This matches the spec's "Hari ini (n) / Besok (n) / Minggu ini (n)" display.
+	/**
+	 * Classify a SheetEvent into a local-calendar day bucket.
+	 *
+	 * Bucket definitions (all in local time):
+	 *   today    — same local calendar day as today.
+	 *   tomorrow — same local calendar day as tomorrow.
+	 *   week     — within the next 7 local days, excluding today and tomorrow
+	 *              (i.e. day+2 through day+7 inclusive).
+	 *
+	 * When dateStart is absent, the event falls back to the tier proxy:
+	 *   tier now/soon/today → 'today' bucket; tier later → 'week' bucket.
+	 */
+	function classifyEventDay(event: SheetEvent): 'today' | 'tomorrow' | 'week' | 'other' {
+		if (!event.dateStart) {
+			// Fallback: use tier as proxy when dateStart is absent.
+			return event.tier === 'now' || event.tier === 'soon' || event.tier === 'today'
+				? 'today'
+				: 'week';
+		}
+
+		const eventDate = new Date(event.dateStart);
+		const now = new Date();
+
+		// Normalise both to local midnight for calendar-day comparison.
+		const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const eventMidnight = new Date(
+			eventDate.getFullYear(),
+			eventDate.getMonth(),
+			eventDate.getDate()
+		);
+
+		const diffDays = Math.round(
+			(eventMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24)
+		);
+
+		if (diffDays === 0) return 'today';
+		if (diffDays === 1) return 'tomorrow';
+		if (diffDays >= 2 && diffDays <= 7) return 'week';
+		return 'other';
+	}
+
 	const dayChips = $derived([
 		{
 			key: 'today' as const,
 			label: m.pin_sheet_day_today(),
-			count: events.filter((e) => e.tier === 'now' || e.tier === 'soon' || e.tier === 'today')
-				.length,
+			count: events.filter((e) => classifyEventDay(e) === 'today').length,
 			active: activeDay === 'today'
 		},
 		{
 			key: 'tomorrow' as const,
 			label: m.pin_sheet_day_tomorrow(),
-			count: 0,
+			count: events.filter((e) => classifyEventDay(e) === 'tomorrow').length,
 			active: activeDay === 'tomorrow'
 		},
 		{
 			key: 'week' as const,
 			label: m.pin_sheet_day_this_week(),
-			count: events.filter((e) => e.tier === 'later').length,
+			count: events.filter((e) => classifyEventDay(e) === 'week').length,
 			active: activeDay === 'week'
 		}
 	]);
 
-	// Events shown in full mode — same-day events (tier now/soon/today)
-	const fullEvents = $derived(
-		events.filter((e) => e.tier === 'now' || e.tier === 'soon' || e.tier === 'today')
-	);
+	// Events shown in full mode — filtered by the active day chip selection.
+	const fullEvents = $derived(events.filter((e) => classifyEventDay(e) === activeDay));
 </script>
 
 <!--
@@ -171,7 +210,7 @@
 
 			<button
 				class="icon-btn"
-				onclick={onexpand}
+				onclick={mode === 'full' ? oncollapse : onexpand}
 				aria-label={mode === 'full' ? m.pin_sheet_collapse() : m.pin_sheet_expand()}
 				aria-expanded={mode === 'full'}
 			>
@@ -200,6 +239,7 @@
 					<button
 						class="day-chip"
 						class:day-chip--active={chip.active}
+						aria-pressed={chip.active}
 						onclick={() => ondayselect?.(chip.key)}
 					>
 						{chip.label}{chip.count > 0 ? ` (${chip.count})` : ''}

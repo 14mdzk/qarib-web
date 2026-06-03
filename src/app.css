@@ -121,6 +121,10 @@
 	--color-primary-hover: #c9711c;
 	--color-accent: #e88b2e;
 
+	/* ── Color: danger (error card) ─────────────────────────────────────── */
+	--color-danger-bg: #f4e5e5;
+	--color-danger-ink: #8b3a3a;
+
 	/* ── Radius scale ───────────────────────────────────────────────────── */
 	--radius-sm: 10px;
 	--radius: 14px;
