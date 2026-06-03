@@ -62,6 +62,14 @@ export const serverEnvSchema = z.object({
 		.string({ error: 'UPSTREAM_API_URL is required' })
 		.url('UPSTREAM_API_URL must be a valid absolute URL'),
 
+	/**
+	 * Stadia Maps API key for the tile proxy (ADR 0013). Server-only — never
+	 * exposed to the client. Required for the /api/tiles BFF route.
+	 */
+	STADIA_API_KEY: z
+		.string({ error: 'STADIA_API_KEY is required' })
+		.min(8, 'STADIA_API_KEY must be at least 8 characters'),
+
 	/** Node runtime environment. Controls HSTS, debug logging, etc. */
 	NODE_ENV: z.enum(['development', 'test', 'production']).default('development')
 });

@@ -76,7 +76,8 @@ describe('publicEnvSchema', () => {
 
 describe('serverEnvSchema', () => {
 	const validServerEnv = {
-		UPSTREAM_API_URL: 'https://goscratch.example.com'
+		UPSTREAM_API_URL: 'https://goscratch.example.com',
+		STADIA_API_KEY: 'test-stadia-key-ok'
 	};
 
 	it('parses a valid server environment', () => {
@@ -110,6 +111,21 @@ describe('serverEnvSchema', () => {
 			serverEnvSchema.parse({ ...validServerEnv, UPSTREAM_API_URL: 'not-a-url' })
 		).toThrow();
 	});
+
+	it('throws when STADIA_API_KEY is missing', () => {
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructure to omit the key
+		const { STADIA_API_KEY: _key, ...withoutKey } = validServerEnv;
+		expect(() => serverEnvSchema.parse(withoutKey)).toThrow();
+	});
+
+	it('throws when STADIA_API_KEY is too short (< 8 chars)', () => {
+		expect(() => serverEnvSchema.parse({ ...validServerEnv, STADIA_API_KEY: 'short' })).toThrow();
+	});
+
+	it('accepts a valid STADIA_API_KEY', () => {
+		const result = serverEnvSchema.parse(validServerEnv);
+		expect(result.STADIA_API_KEY).toBe('test-stadia-key-ok');
+	});
 });
 
 // ---------------------------------------------------------------------------
@@ -137,7 +153,8 @@ describe('parsePublicEnv', () => {
 
 describe('parseServerEnv', () => {
 	const validRaw = {
-		UPSTREAM_API_URL: 'https://goscratch.example.com'
+		UPSTREAM_API_URL: 'https://goscratch.example.com',
+		STADIA_API_KEY: 'test-stadia-key-ok'
 	};
 
 	it('returns typed config with derived isProd flag', () => {

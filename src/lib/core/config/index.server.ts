@@ -15,7 +15,7 @@
  *   - .claude/rules/security.md      (secrets server-side only, fail-fast)
  *   - .claude/rules/architecture.md  (server-only module, core/ layer)
  */
-import { UPSTREAM_API_URL } from '$env/static/private';
+import { UPSTREAM_API_URL, STADIA_API_KEY } from '$env/static/private';
 import { parseServerEnv } from './schema.js';
 import type { DerivedServerEnv } from './schema.js';
 
@@ -32,5 +32,6 @@ export type { DerivedServerEnv };
  */
 export const serverConfig: DerivedServerEnv = parseServerEnv({
 	UPSTREAM_API_URL,
+	STADIA_API_KEY,
 	NODE_ENV: process.env.NODE_ENV
 });

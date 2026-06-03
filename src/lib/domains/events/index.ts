@@ -43,3 +43,6 @@ export {
 	defineSeriesUpcomingQuery,
 	defineSeriesRecurringsQuery
 } from './queries.js';
+
+export { deriveTier, tierToTokenColor } from './pin-tier.js';
+export type { PinTier } from './pin-tier.js';
