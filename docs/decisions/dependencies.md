@@ -8,6 +8,7 @@ One-line rationale per non-trivial dependency added to `package.json`. New entri
 |---|---|---|
 | `clsx` | `^2.1.1` | Idiomatic conditional-className builder. ~239 B, ESM-only, single-purpose, MIT. Used by `cn()` in `src/lib/shared/utils/cn.ts`. |
 | `tailwind-merge` | `^3.5.0` | Resolves conflicting Tailwind utility classes (later wins). ~5 KB, ESM-only, single-purpose, MIT. Used by `cn()` to make `clsx` output safe under Tailwind. |
+| `leaflet` | `^1.9.4` | Raster map rendering for the MapView client-only island (ADR 0011, ADR 0013). Hand-rolling an interactive tiled map is not feasible in < 50 LOC; Leaflet is the dominant, actively-maintained, MIT-licensed choice. Imported only in `onMount` — zero SSR surface. |
 
 ## Font dependencies
 
@@ -24,6 +25,7 @@ One-line rationale per non-trivial dependency added to `package.json`. New entri
 | Package | Version | Rationale |
 |---|---|---|
 | `@vitest/coverage-v8` | `^4.1.5` | V8-based coverage provider for Vitest. Peer of `vitest`; required to run `vitest --coverage`. Zero runtime surface, test-only, MIT. |
+| `@types/leaflet` | `^1.9.15` | TypeScript type definitions for Leaflet. Dev-only; no runtime surface. MIT. |
 
 ## Conventions
 

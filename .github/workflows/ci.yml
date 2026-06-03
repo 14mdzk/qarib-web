@@ -37,9 +37,9 @@ jobs:
         run: bun run test
       - name: Build
         env:
-          # The BFF proxy consumes UPSTREAM_API_URL from `$env/static/private`.
-          # SvelteKit resolves it at build time. CI has no `.env`, so we provide
-          # a CI-safe placeholder. Real deployments populate via the platform env
-          # (Vercel, Fly, etc.).
+          # Private env vars consumed from `$env/static/private` at build time.
+          # CI has no `.env`, so we provide CI-safe placeholders. Real deployments
+          # populate via the platform env (Vercel, Fly, etc.).
           UPSTREAM_API_URL: https://upstream.example.com
+          STADIA_API_KEY: ci-build-placeholder
         run: bun run build
