@@ -287,6 +287,22 @@ export const Endpoints = {
 		method: 'GET',
 		path: (a) =>
 			`/api/upstream/events/series/${encodeURIComponent(a.slug)}/recurrings${qs({ limit: a.limit, cursor: a.cursor })}`
+	}),
+
+	/**
+	 * Event series template by UUID.
+	 *
+	 * Mirrors `events.series` (by-slug) but keyed by the event series UUID.
+	 * The `/kajian/[id]` route uses this; the route param IS the series UUID.
+	 */
+	'events.seriesById': defineEndpoint<
+		{ id: string; expand?: string },
+		void,
+		DataOf<Get200<'/events/series/by-id/{id}', 'get'>>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/series/by-id/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
 	})
 } as const;
 

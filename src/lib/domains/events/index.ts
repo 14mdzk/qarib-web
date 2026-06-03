@@ -27,10 +27,11 @@ export {
 	fetchEvent,
 	fetchEventSeries,
 	fetchSeriesUpcoming,
-	fetchSeriesRecurrings
+	fetchSeriesRecurrings,
+	fetchSeriesById
 } from './service.js';
 
-export type { NearbyArgs, ListArgs, SeriesPaginatedArgs } from './service.js';
+export type { NearbyArgs, ListArgs, SeriesPaginatedArgs, SeriesByIdArgs } from './service.js';
 
 export {
 	eventKeys,
@@ -43,7 +44,9 @@ export {
 	defineEventQuery,
 	defineEventSeriesQuery,
 	defineSeriesUpcomingQuery,
-	defineSeriesRecurringsQuery
+	defineSeriesRecurringsQuery,
+	defineSeriesByIdQuery,
+	defineOccurrencesByEventQuery
 } from './queries.js';
 
 export { deriveTier, tierToTokenColor } from './pin-tier.js';

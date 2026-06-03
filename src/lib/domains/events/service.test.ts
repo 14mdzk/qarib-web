@@ -10,7 +10,13 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { ApiError } from '$core/api';
-import { fetchNearbyEvents, fetchEventList, fetchEvent, fetchEventSeries } from './service.js';
+import {
+	fetchNearbyEvents,
+	fetchEventList,
+	fetchEvent,
+	fetchEventSeries,
+	fetchSeriesById
+} from './service.js';
 
 function baseOpts() {
 	return { fetch: globalThis.fetch, baseUrl: 'http://localhost' } as const;
@@ -190,5 +196,70 @@ describe('fetchEventSeries', () => {
 		const result = await fetchEventSeries('kajian-pagi', undefined, baseOpts());
 
 		expect(result?.slug).toBe('kajian-pagi');
+	});
+});
+
+// ---------------------------------------------------------------------------
+// fetchSeriesById
+// ---------------------------------------------------------------------------
+
+describe('fetchSeriesById', () => {
+	it('hits /api/upstream/events/series/by-id/{id} and returns the series', async () => {
+		server.use(
+			http.get('http://localhost/api/upstream/events/series/by-id/series-uuid-001', () =>
+				HttpResponse.json({
+					success: true,
+					data: {
+						id: 'series-uuid-001',
+						slug: 'kajian-tafsir',
+						name: { id: 'Kajian Tafsir' }
+					}
+				})
+			)
+		);
+
+		const result = await fetchSeriesById('series-uuid-001', undefined, baseOpts());
+
+		expect(result?.id).toBe('series-uuid-001');
+		expect(result?.slug).toBe('kajian-tafsir');
+	});
+
+	it('passes the expand param in the query string when provided', async () => {
+		let capturedUrl = '';
+		server.use(
+			http.get(
+				'http://localhost/api/upstream/events/series/by-id/series-uuid-001',
+				({ request }) => {
+					capturedUrl = request.url;
+					return HttpResponse.json({
+						success: true,
+						data: {
+							id: 'series-uuid-001',
+							slug: 'kajian-tafsir',
+							name: { id: 'Kajian Tafsir' }
+						}
+					});
+				}
+			)
+		);
+
+		await fetchSeriesById('series-uuid-001', 'place,asatidz', baseOpts());
+
+		expect(capturedUrl).toContain('expand=');
+		expect(capturedUrl).toContain('place');
+		expect(capturedUrl).toContain('asatidz');
+	});
+
+	it('throws ApiError on 404', async () => {
+		server.use(
+			http.get(
+				'http://localhost/api/upstream/events/series/by-id/not-found-uuid',
+				() => new HttpResponse(null, { status: 404, statusText: 'Not Found' })
+			)
+		);
+
+		await expect(fetchSeriesById('not-found-uuid', undefined, baseOpts())).rejects.toSatisfy(
+			(e: unknown) => e instanceof ApiError && e.status === 404
+		);
 	});
 });

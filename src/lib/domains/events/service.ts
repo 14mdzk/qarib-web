@@ -48,6 +48,11 @@ export interface SeriesPaginatedArgs {
 	cursor?: string;
 }
 
+export interface SeriesByIdArgs {
+	id: string;
+	expand?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Service functions
 // ---------------------------------------------------------------------------
@@ -124,4 +129,19 @@ export async function fetchSeriesRecurrings(
 	opts?: ApiCallOptions
 ): Promise<Paginated<EventRecurringResponse[]>> {
 	return api('events.seriesRecurrings', args, undefined, opts);
+}
+
+/**
+ * Event series template by UUID.
+ * The `/kajian/[id]` route param is the series UUID — use this instead of
+ * `fetchEventSeries` (which takes a slug) for that route.
+ * Returns whatever `api()` unwraps from `envelope.data` — may be `undefined`
+ * if the generated type marks the field optional.
+ */
+export async function fetchSeriesById(
+	id: string,
+	expand?: string,
+	opts?: ApiCallOptions
+): Promise<EventSeriesResponse | undefined> {
+	return api('events.seriesById', { id, expand }, undefined, opts);
 }
