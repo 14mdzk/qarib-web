@@ -7,7 +7,58 @@
  * Conformance: rule .claude/rules/testing.md
  */
 import { describe, it, expect } from 'vitest';
-import { buildNextPageArgs, buildNearbyQueryOptions, eventKeys } from './queries.js';
+import {
+	buildNextPageArgs,
+	buildNearbyQueryOptions,
+	eventKeys,
+	nearbyNextPageParam
+} from './queries.js';
+import type { Paginated } from '$core/api';
+import type { EventRecurringResponse } from './schema.js';
+
+// ---------------------------------------------------------------------------
+// nearbyNextPageParam — getNextPageParam for the infinite query
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper to build a minimal Paginated page for testing `nearbyNextPageParam`.
+ * TanStack's contract: `undefined` = no next page (hasNextPage=false);
+ * any other value (including `null`) = there IS a next page.
+ * So `nearbyNextPageParam` must return `undefined`, not `null`, when exhausted.
+ */
+function makePage(next_cursor: string | null | undefined): Paginated<EventRecurringResponse[]> {
+	return {
+		data: [],
+		pagination: {
+			next_cursor,
+			prev_cursor: null,
+			has_more: next_cursor != null,
+			has_prev: false
+		}
+	};
+}
+
+describe('nearbyNextPageParam', () => {
+	it('returns the cursor string when next_cursor is present', () => {
+		const result = nearbyNextPageParam(makePage('abc-cursor-123'));
+		expect(result).toBe('abc-cursor-123');
+	});
+
+	it('returns undefined (not null) when next_cursor is null — exhaustion case', () => {
+		// Returning null would keep hasNextPage=true and loop fetchNextPage forever.
+		const result = nearbyNextPageParam(makePage(null));
+		expect(result).toBeUndefined();
+	});
+
+	it('returns undefined when next_cursor is absent from pagination', () => {
+		const page: Paginated<EventRecurringResponse[]> = {
+			data: [],
+			pagination: { has_more: false, has_prev: false }
+		};
+		const result = nearbyNextPageParam(page);
+		expect(result).toBeUndefined();
+	});
+});
 
 // ---------------------------------------------------------------------------
 // buildNextPageArgs — cursor accumulation helper

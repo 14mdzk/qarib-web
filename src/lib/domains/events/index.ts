@@ -36,7 +36,9 @@ export {
 	eventKeys,
 	buildNextPageArgs,
 	buildNearbyQueryOptions,
+	nearbyNextPageParam,
 	defineNearbyQuery,
+	defineNearbyInfiniteQuery,
 	defineEventListQuery,
 	defineEventQuery,
 	defineEventSeriesQuery,
@@ -46,3 +48,5 @@ export {
 
 export { deriveTier, tierToTokenColor } from './pin-tier.js';
 export type { PinTier } from './pin-tier.js';
+
+export { createEventsView, getEventsView, EventsViewService } from './store.svelte.js';

@@ -6,22 +6,24 @@
  *   - `buildNearbyQueryOptions` — pure options builder for nearby events
  *     (testable without component lifecycle).
  *   - `defineNearbyQuery` — reactive wrapper (requires Svelte context).
- *   - `buildNextPageArgs` — pure helper: given a `PaginationMeta`, returns
- *     cursor args for the next page or `null` when `has_more` is false.
- *     Enables cursor-accumulation logic at the call site.
- *
- * Cursor pagination note: TanStack infinite query (`createInfiniteQuery`) is
- * not wired here yet because it requires a stable `getNextPageParam`
- * interface — that is a C3 concern when the list UI lands. For now callers
- * drive pagination by extracting `pagination.next_cursor` from each page's
- * `data` field and passing it as the `cursor` arg to the next call.
+ *   - `defineNearbyInfiniteQuery` — cursor-paginated infinite query for the
+ *     list UI (C3). Uses `createInfiniteQuery` with `getNextPageParam` wired
+ *     to `pagination.next_cursor`. Accepts `initialData` for SSR seeding.
+ *   - `buildNextPageArgs` — pure cursor-accumulation helper (kept for callers
+ *     that drive pagination imperatively, e.g. server-side pre-fetch).
  *
  * Conformance:
  *   - rule .claude/rules/api-contract.md   (all upstream calls via api())
  *   - rule .claude/rules/architecture.md   (queries.ts in domains/events/)
+ *   - rule .claude/rules/state-management.md (server data in svelte-query)
  */
+import { createInfiniteQuery } from '@tanstack/svelte-query';
 import { buildQueryOptions, defineQuery } from '$core/query';
-import type { PaginationMeta } from '$core/api';
+import { api } from '$core/api';
+import type { InfiniteData } from '@tanstack/svelte-query';
+import type { QueryClient } from '@tanstack/svelte-query';
+import type { Paginated, PaginationMeta } from '$core/api';
+import type { EventRecurringResponse } from './schema.js';
 import type { NearbyArgs, ListArgs, SeriesPaginatedArgs } from './service.js';
 
 // ---------------------------------------------------------------------------
@@ -97,6 +99,89 @@ export function defineNearbyQuery(
 	opts?: { enabled?: boolean; staleTime?: number; requestId?: string }
 ) {
 	return defineQuery('events.nearby', args, opts);
+}
+
+// ---------------------------------------------------------------------------
+// Infinite query — nearby cursor pagination
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure `getNextPageParam` implementation for the nearby infinite query.
+ *
+ * TanStack Query treats `undefined` (not `null`) as the sentinel for "no next
+ * page" — returning `undefined` sets `hasNextPage = false` and prevents
+ * `fetchNextPage` from looping on the last page. `null` would be treated as a
+ * valid page param and keep `hasNextPage = true` indefinitely.
+ *
+ * Exported for unit testing without component lifecycle.
+ */
+export function nearbyNextPageParam(last: Paginated<EventRecurringResponse[]>): string | undefined {
+	return last.pagination?.next_cursor ?? undefined;
+}
+
+/**
+ * Cursor-paginated nearby events — for the `/peta` list UI.
+ *
+ * Wraps `createInfiniteQuery` so server data lives in svelte-query
+ * (state-management.md rule). `getNextPageParam` extracts
+ * `pagination.next_cursor` from each page response.
+ *
+ * Pass `initialData` to seed from an SSR server-load result, avoiding
+ * a client waterfall on first paint.
+ *
+ * @param argsGetter  - Reactive accessor returning the base `NearbyArgs`
+ *                      (without `cursor` — the query manages that internally).
+ * @param initialData - Optional SSR seed; shape must match `InfiniteData`.
+ */
+export function defineNearbyInfiniteQuery(
+	/**
+	 * Reactive accessor that returns both the base NearbyArgs AND the optional
+	 * SSR initialData seed. Using a single accessor ensures createInfiniteQuery
+	 * tracks all reactive dependencies correctly without Svelte's
+	 * `state_referenced_locally` warning.
+	 */
+	optionsGetter: () => {
+		args: NearbyArgs;
+		initialData?: InfiniteData<Paginated<EventRecurringResponse[]>, string | null>;
+	},
+	/**
+	 * Pass a QueryClient when QueryClientProvider is not yet in the layout context.
+	 *
+	 * @deprecated Remove this param once QueryClientProvider is wired in the root
+	 * layout. Until then it avoids a missing-context throw. D/E/F pages must NOT
+	 * cargo-cult the page-local client — they should use the shared provider instead.
+	 */
+	queryClient?: QueryClient
+) {
+	return createInfiniteQuery<
+		Paginated<EventRecurringResponse[]>,
+		Error,
+		InfiniteData<Paginated<EventRecurringResponse[]>, string | null>,
+		readonly ['events', 'nearby', NearbyArgs],
+		string | null
+	>(
+		() => {
+			const { args, initialData } = optionsGetter();
+			return {
+				queryKey: eventKeys.nearby(args),
+				queryFn: ({ pageParam, signal }) =>
+					api('events.nearby', { ...args, cursor: pageParam ?? undefined }, undefined, {
+						signal,
+						// '' = relative same-origin path; resolves to /api/upstream/... in both
+						// browser and SvelteKit server contexts (server load passes event.fetch).
+						baseUrl: ''
+					}),
+				initialPageParam: null,
+				getNextPageParam: nearbyNextPageParam,
+				// Mark SSR-seeded data as fresh for `staleTime` so TanStack does not
+				// immediately background-refetch page 1 on every mount — which would
+				// duplicate the SSR fetch and waste a round-trip.
+				initialDataUpdatedAt: initialData ? Date.now() : undefined,
+				initialData
+			};
+		},
+		queryClient ? () => queryClient : undefined
+	);
 }
 
 /**
