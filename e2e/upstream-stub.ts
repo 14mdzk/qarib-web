@@ -15,6 +15,12 @@ type Handler = (req: http.IncomingMessage, res: http.ServerResponse, body: strin
 
 const routes = new Map<string, Handler>();
 
+/**
+ * Prefix-based routes: matched when the request path starts with the key.
+ * Used for endpoints with arbitrary query strings (e.g. nearby with lat/lng).
+ */
+const prefixRoutes: Array<{ method: string; prefix: string; handler: Handler }> = [];
+
 // ---------------------------------------------------------------------------
 // Response helpers
 // ---------------------------------------------------------------------------
@@ -97,6 +103,64 @@ routes.set('GET:/auth/session', (_req, res) => {
 	});
 });
 
+// GET /events/nearby?… (prefix match — handles any query string combination)
+prefixRoutes.push({
+	method: 'GET',
+	prefix: '/events/nearby',
+	handler: (_req, res) => {
+		json(res, 200, {
+			success: true,
+			data: [
+				{
+					id: 1001,
+					event_id: 'uuid-series-a',
+					name: { id: 'Kajian Tafsir Al-Quran', en: 'Tafsir Al-Quran Study' },
+					date_start: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+					date_end: null,
+					date_prayer: 4,
+					status: 0,
+					going_count: 12,
+					distance_km: 0.8,
+					place: {
+						id: 'place-uuid-1',
+						slug: 'masjid-al-falah',
+						name: { id: 'Masjid Al-Falah', en: 'Masjid Al-Falah' },
+						address: 'Jl. Contoh No. 1, Cirebon',
+						lat: -6.732,
+						lng: 108.5523
+					}
+				},
+				{
+					id: 1002,
+					event_id: 'uuid-series-b',
+					name: { id: "Pengajian Ibu-Ibu Ba'da Isya", en: 'Post-Isha Study Circle' },
+					date_start: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+					date_end: null,
+					date_prayer: 2,
+					status: 0,
+					going_count: 7,
+					distance_km: 1.4,
+					place: {
+						id: 'place-uuid-2',
+						slug: 'masjid-jami-cirebon',
+						name: { id: "Masjid Jami' Cirebon", en: "Masjid Jami' Cirebon" },
+						address: "Jl. Jami' No. 5, Cirebon",
+						lat: -6.74,
+						lng: 108.561
+					}
+				}
+			],
+			pagination: {
+				next_cursor: null,
+				prev_cursor: null,
+				has_more: false,
+				has_prev: false,
+				total: 2
+			}
+		});
+	}
+});
+
 // ---------------------------------------------------------------------------
 // Server factory
 // ---------------------------------------------------------------------------
@@ -107,18 +171,32 @@ export function createStubServer(): http.Server {
 		const url = req.url ?? '/';
 		const key = `${method}:${url}`;
 
+		// Path without query string — for prefix matching.
+		const path = url.split('?')[0];
+
 		let body = '';
 		req.on('data', (chunk) => (body += chunk));
 		req.on('end', () => {
+			// Exact match first.
 			const handler = routes.get(key);
 			if (handler) {
 				handler(req, res, body);
-			} else {
-				json(res, 404, {
-					success: false,
-					error: { code: 'NOT_FOUND', message: `${key} not found` }
-				});
+				return;
 			}
+
+			// Prefix match (method + path starts with prefix).
+			const prefixMatch = prefixRoutes.find(
+				(r) => r.method === method && path.startsWith(r.prefix)
+			);
+			if (prefixMatch) {
+				prefixMatch.handler(req, res, body);
+				return;
+			}
+
+			json(res, 404, {
+				success: false,
+				error: { code: 'NOT_FOUND', message: `${key} not found` }
+			});
 		});
 	});
 

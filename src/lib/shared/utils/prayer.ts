@@ -19,3 +19,26 @@ export function getPrayerLabel(prayerTime: string | null | undefined): string | 
 	const fn = PRAYER_MESSAGE_MAP[key];
 	return fn ? fn() : prayerTime;
 }
+
+/**
+ * Map numeric `date_prayer` integer from the upstream API to a localised
+ * prayer anchor label.
+ *
+ * Numeric enum from `App\Enums\EventDatePrayer`:
+ *   0 = NONE, 1 = MAGHRIB, 2 = ISHA, 3 = SUBUH, 4 = DZUHR, 5 = ASR
+ *
+ * Returns `null` for 0 (NONE) or unknown values.
+ */
+const PRAYER_INT_KEY: Record<number, string> = {
+	1: 'maghrib',
+	2: 'isha',
+	3: 'subuh',
+	4: 'dzuhr',
+	5: 'asr'
+};
+
+export function prayerIntToLabel(datePrayer: number | null | undefined): string | null {
+	if (datePrayer == null || datePrayer === 0) return null;
+	const key = PRAYER_INT_KEY[datePrayer];
+	return key ? getPrayerLabel(key) : null;
+}
