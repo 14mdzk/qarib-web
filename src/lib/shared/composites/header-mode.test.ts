@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { resolveHeaderMode } from './header-mode';
 
 describe('resolveHeaderMode', () => {
-	it('returns "home" for /', () => {
-		expect(resolveHeaderMode('/')).toBe('home');
+	it('returns "back" for / (marketing landing, not app home)', () => {
+		expect(resolveHeaderMode('/')).toBe('back');
 	});
 
 	it('returns "home" for /peta', () => {
