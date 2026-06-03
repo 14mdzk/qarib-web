@@ -1,177 +1,125 @@
 /**
- * E2E tests for the /peta nearby-kajian page — list view + map view.
+ * E2E tests for the /peta nearby-kajian page — Hi-Fi v2 map-only home.
  *
  * The upstream stub (e2e/upstream-stub.ts) handles `GET /events/nearby?…`
- * with a prefix match and returns two occurrences with place lat/lng. These
- * tests assert:
+ * with a prefix match and returns two occurrences with place lat/lng.
  *
- * List view:
- *   - /peta loads and renders at least one EventCard (kajian title + masjid name).
- *   - Each card links to /kajian/{id}.
- *   - The date strip is rendered.
+ * These tests assert the MapHomeV2 shell and ABSENCE of the old list/map toggle:
+ *   - /peta loads and renders the Leaflet map container (full-bleed, no toggle).
+ *   - No list/map toggle buttons are present (confirmed removed).
+ *   - Leaflet markers appear for each stub place (.leaflet-marker-icon).
+ *   - The filter chip strip is rendered at the top of the map.
+ *   - The GPS FAB is rendered.
+ *   - A pin click opens a PinSheet (peek mode) with place name visible.
+ *   - PinSheet can be expanded via the chevron button.
+ *   - PinSheet can be closed via the scrim/collapse button.
  *
- * Map view (C3b):
- *   - Toggling to "Peta" renders the Leaflet container (.leaflet-container).
- *   - Leaflet markers appear (.leaflet-marker-icon).
- *   - A pin click (via the marker or via a direct selectedPinId trigger) shows a
- *     callout with a "Buka kajian" link to /kajian/{id}.
- *   - The callout close button dismisses it.
- *   - Toggling back to "Daftar" renders the list again.
+ * Note: Leaflet requires a real browser context; tile endpoints may return
+ * errors (test key / network) but the map container and markers still render
+ * because Leaflet initialises synchronously on mount.
  *
  * Conformance: rule .claude/rules/testing.md (Playwright e2e, *.e2e.ts suffix).
  */
 import { test, expect } from '@playwright/test';
 
-test.describe('/peta list view', () => {
-	test('renders nearby kajian cards with title and masjid', async ({ page }) => {
+test.describe('/peta — Hi-Fi v2 map home', () => {
+	test('renders the map container full-bleed (no list/map toggle present)', async ({ page }) => {
 		await page.goto('/peta');
 
-		// Wait for at least one event card to appear (data from SSR load).
-		const card = page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first();
-		await expect(card).toBeVisible({ timeout: 10_000 });
-
-		// The masjid name should also be visible within that card region.
-		await expect(page.getByText('Masjid Al-Falah').first()).toBeVisible();
-	});
-
-	test('each card links to /kajian/{id}', async ({ page }) => {
-		await page.goto('/peta');
-
-		const card = page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first();
-		await expect(card).toBeVisible({ timeout: 10_000 });
-
-		const href = await card.getAttribute('href');
-		expect(href).toMatch(/\/kajian\/1001/);
-	});
-
-	test('renders a second kajian card', async ({ page }) => {
-		await page.goto('/peta');
-
-		const secondCard = page.getByRole('link', { name: /Pengajian Ibu-Ibu/i }).first();
-		await expect(secondCard).toBeVisible({ timeout: 10_000 });
-	});
-
-	test('renders the date strip', async ({ page }) => {
-		await page.goto('/peta');
-
-		// The "Hari ini" button should be visible in the date strip.
-		await expect(page.getByRole('button', { name: 'Hari ini' })).toBeVisible();
-	});
-
-	test('renders the location request affordance', async ({ page }) => {
-		await page.goto('/peta');
-
-		await expect(page.getByRole('button', { name: /lokasi/i }).first()).toBeVisible();
-	});
-});
-
-test.describe('/peta map view (C3b)', () => {
-	test('toggle to Peta renders the Leaflet container', async ({ page }) => {
-		await page.goto('/peta');
-
-		// Wait for the list to load so the toggle is rendered.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 10_000
-		});
-
-		// Click the "Peta" toggle button.
-		await page.getByRole('button', { name: 'Peta', exact: true }).click();
-
-		// The Leaflet container should be present in the DOM.
-		// Tiles may return 502 with the test key — that is fine; the container and
-		// markers still render because Leaflet initialises synchronously on mount.
-		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
-	});
-
-	test('map view renders Leaflet markers for pinned events', async ({ page }) => {
-		await page.goto('/peta');
-
-		// Wait for data.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 10_000
-		});
-
-		// Switch to map view.
-		await page.getByRole('button', { name: 'Peta', exact: true }).click();
-
-		// Leaflet container present.
+		// Map container must be present — Leaflet renders this when the island mounts.
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		// The two stub events both have valid lat/lng — their markers should render.
-		// Leaflet renders marker divs with .leaflet-marker-icon once the map initialises.
-		await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10_000 });
+		// Confirm the old toggle buttons are gone.
+		await expect(page.getByRole('button', { name: 'Peta', exact: true })).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Daftar', exact: true })).toHaveCount(0);
 	});
 
-	test('pin click shows callout with Buka kajian link', async ({ page }) => {
+	test('renders the date filter chip strip over the map', async ({ page }) => {
 		await page.goto('/peta');
 
-		// Wait for data and switch to map.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 10_000
-		});
-		await page.getByRole('button', { name: 'Peta', exact: true }).click();
+		// Wait for map to mount.
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		// Wait for markers to appear, then click the first one.
+		// "Hari ini" chip is the first chip in the filter strip.
+		await expect(page.getByRole('button', { name: 'Hari ini' }).first()).toBeVisible();
+	});
+
+	test('renders Leaflet markers for the stub places', async ({ page }) => {
+		await page.goto('/peta');
+
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		// The two stub events belong to two different places → exactly two place pins.
+		const markers = page.locator('.leaflet-marker-icon');
+		await expect(markers.first()).toBeVisible({ timeout: 10_000 });
+		await expect(markers).toHaveCount(2);
+	});
+
+	test('GPS FAB is rendered', async ({ page }) => {
+		await page.goto('/peta');
+
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		// MapFab renders a button with the GPS aria-label.
+		await expect(page.getByRole('button', { name: /Lokasiku/i }).first()).toBeVisible();
+	});
+
+	test('pin click shows pin sheet peek mode', async ({ page }) => {
+		await page.goto('/peta');
+
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		// Wait for markers to appear.
+		const firstMarker = page.locator('.leaflet-marker-icon').first();
+		await expect(firstMarker).toBeVisible({ timeout: 10_000 });
+
+		await firstMarker.click();
+
+		// PinSheet renders with role="complementary" when a place is selected.
+		const sheet = page.getByRole('complementary').first();
+		await expect(sheet).toBeVisible({ timeout: 5_000 });
+	});
+
+	test('pin sheet expand button switches to full mode', async ({ page }) => {
+		await page.goto('/peta');
+
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
 		const firstMarker = page.locator('.leaflet-marker-icon').first();
 		await expect(firstMarker).toBeVisible({ timeout: 10_000 });
 		await firstMarker.click();
 
-		// The callout dialog should appear with a "Buka kajian" link.
-		const callout = page.getByRole('dialog').first();
-		await expect(callout).toBeVisible({ timeout: 5_000 });
+		const sheet = page.getByRole('complementary').first();
+		await expect(sheet).toBeVisible({ timeout: 5_000 });
 
-		const bukaLink = callout.getByRole('link', { name: /Buka kajian/i });
-		await expect(bukaLink).toBeVisible();
+		// The expand button is the icon-btn in the place strip (aria-expanded=false in peek).
+		const expandBtn = sheet.getByRole('button', { name: /Lihat semua kajian/i }).first();
+		await expect(expandBtn).toBeVisible();
+		await expandBtn.click();
 
-		const href = await bukaLink.getAttribute('href');
-		// The href should point to /kajian/<id> — stub returns ids 1001 and 1002.
-		// Anchored with $ to prevent matching e.g. /kajian/10012.
-		expect(href).toMatch(/\/kajian\/100[12]$/);
+		// After expand, the button becomes collapse (aria-expanded=true).
+		await expect(sheet.getByRole('button', { name: /Tutup/i }).first()).toBeVisible({
+			timeout: 3_000
+		});
 	});
 
-	test('callout close button dismisses the callout', async ({ page }) => {
+	test('scrim closes pin sheet', async ({ page }) => {
 		await page.goto('/peta');
 
-		// Wait for data and switch to map.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 10_000
-		});
-		await page.getByRole('button', { name: 'Peta', exact: true }).click();
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		// Click the first marker to open the callout.
 		const firstMarker = page.locator('.leaflet-marker-icon').first();
 		await expect(firstMarker).toBeVisible({ timeout: 10_000 });
 		await firstMarker.click();
 
-		const callout = page.getByRole('dialog').first();
-		await expect(callout).toBeVisible({ timeout: 5_000 });
+		const sheet = page.getByRole('complementary').first();
+		await expect(sheet).toBeVisible({ timeout: 5_000 });
 
-		// Click "Tutup" to dismiss.
-		await callout.getByRole('button', { name: /Tutup/i }).click();
-		await expect(callout).not.toBeVisible({ timeout: 3_000 });
-	});
+		// Click the scrim button by its specific aria-label (not the chevron inside the sheet).
+		// The scrim is a button outside the sheet with aria-label matching pin_sheet_collapse.
+		await page.getByRole('button', { name: 'Tutup', exact: true }).last().click();
 
-	test('toggling back to Daftar shows the list view again', async ({ page }) => {
-		await page.goto('/peta');
-
-		// Wait for data and switch to map.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 10_000
-		});
-		await page.getByRole('button', { name: 'Peta', exact: true }).click();
-		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
-
-		// Switch back to list.
-		await page.getByRole('button', { name: 'Daftar', exact: true }).click();
-
-		// The list should reappear.
-		await expect(page.getByRole('link', { name: /Kajian Tafsir Al-Quran/i }).first()).toBeVisible({
-			timeout: 5_000
-		});
-
-		// The Leaflet container should no longer be in the DOM.
-		await expect(page.locator('.leaflet-container')).toHaveCount(0);
+		// Sheet should be gone.
+		await expect(sheet).not.toBeVisible({ timeout: 3_000 });
 	});
 });

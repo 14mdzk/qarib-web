@@ -2,9 +2,9 @@
  * Events domain — UI view state (context-DI factory).
  *
  * Owns UI-only state for the events/peta view:
- *   - `selectedDate`  — the ISO day string selected in the date strip (null = today).
- *   - `viewMode`      — 'list' | 'map' (C3b will use 'map').
- *   - `selectedPinId` — the map pin currently active (C3b).
+ *   - `selectedDate`    — the ISO day string selected in the date strip (null = today).
+ *   - `selectedPlaceId` — the map place (mosque) currently selected; null = no sheet.
+ *   - `sheetMode`       — 'peek' | 'full' (controls pin sheet expansion).
  *
  * Server data (the nearby feed) lives in svelte-query, not here.
  *
@@ -26,23 +26,37 @@ const KEY = Symbol('eventsView');
 
 export class EventsViewService {
 	selectedDate = $state<string | null>(null);
-	viewMode = $state<'list' | 'map'>('list');
-	selectedPinId = $state<number | null>(null);
+	selectedPlaceId = $state<string | null>(null);
+	sheetMode = $state<'peek' | 'full'>('peek');
 
 	/** Select a date strip day (ISO date string). Pass `null` to reset to "today". */
 	selectDate(date: string | null): void {
 		this.selectedDate = date;
-		this.selectedPinId = null;
 	}
 
-	/** Switch the view mode between list and map. */
-	setViewMode(mode: 'list' | 'map'): void {
-		this.viewMode = mode;
+	/**
+	 * Select a place by its ID — opens the pin sheet in peek mode.
+	 * Pass `null` to deselect and close the sheet.
+	 */
+	selectPlace(id: string | null): void {
+		this.selectedPlaceId = id;
+		this.sheetMode = 'peek';
 	}
 
-	/** Mark a map pin as selected (used in C3b when the map is wired). */
-	selectPin(id: number | null): void {
-		this.selectedPinId = id;
+	/** Expand the pin sheet to full mode. */
+	expandSheet(): void {
+		this.sheetMode = 'full';
+	}
+
+	/** Collapse the pin sheet from full back to peek mode (without closing). */
+	collapseSheet(): void {
+		this.sheetMode = 'peek';
+	}
+
+	/** Close the pin sheet and deselect the place. Resets mode to peek. */
+	closeSheet(): void {
+		this.selectedPlaceId = null;
+		this.sheetMode = 'peek';
 	}
 }
 

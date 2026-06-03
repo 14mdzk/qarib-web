@@ -17,17 +17,15 @@ describe('EventsViewService', () => {
 		svc = new EventsViewService();
 	});
 
-	it('starts with selectedDate=null, viewMode=list, selectedPinId=null', () => {
+	it('starts with selectedDate=null, selectedPlaceId=null, sheetMode=peek', () => {
 		expect(svc.selectedDate).toBeNull();
-		expect(svc.viewMode).toBe('list');
-		expect(svc.selectedPinId).toBeNull();
+		expect(svc.selectedPlaceId).toBeNull();
+		expect(svc.sheetMode).toBe('peek');
 	});
 
-	it('selectDate sets the date and clears the selected pin', () => {
-		svc.selectedPinId = 42;
+	it('selectDate sets the date', () => {
 		svc.selectDate('2026-06-10');
 		expect(svc.selectedDate).toBe('2026-06-10');
-		expect(svc.selectedPinId).toBeNull();
 	});
 
 	it('selectDate(null) resets the date', () => {
@@ -36,17 +34,50 @@ describe('EventsViewService', () => {
 		expect(svc.selectedDate).toBeNull();
 	});
 
-	it('setViewMode switches between list and map', () => {
-		svc.setViewMode('map');
-		expect(svc.viewMode).toBe('map');
-		svc.setViewMode('list');
-		expect(svc.viewMode).toBe('list');
+	it('selectPlace sets selectedPlaceId and resets sheetMode to peek', () => {
+		svc.expandSheet();
+		expect(svc.sheetMode).toBe('full');
+
+		svc.selectPlace('place-uuid-1');
+		expect(svc.selectedPlaceId).toBe('place-uuid-1');
+		expect(svc.sheetMode).toBe('peek');
 	});
 
-	it('selectPin sets and clears the selected pin id', () => {
-		svc.selectPin(7);
-		expect(svc.selectedPinId).toBe(7);
-		svc.selectPin(null);
-		expect(svc.selectedPinId).toBeNull();
+	it('selectPlace(null) clears the selected place', () => {
+		svc.selectPlace('place-uuid-1');
+		svc.selectPlace(null);
+		expect(svc.selectedPlaceId).toBeNull();
+	});
+
+	it('expandSheet sets sheetMode to full', () => {
+		svc.selectPlace('place-uuid-1');
+		svc.expandSheet();
+		expect(svc.sheetMode).toBe('full');
+	});
+
+	it('closeSheet clears selectedPlaceId', () => {
+		svc.selectPlace('place-uuid-1');
+		svc.closeSheet();
+		expect(svc.selectedPlaceId).toBeNull();
+	});
+
+	it('closeSheet reverts sheetMode to peek when called while full', () => {
+		svc.selectPlace('place-uuid-1');
+		svc.expandSheet();
+		expect(svc.sheetMode).toBe('full');
+
+		svc.closeSheet();
+		expect(svc.sheetMode).toBe('peek');
+	});
+
+	it('collapseSheet sets sheetMode to peek', () => {
+		svc.selectPlace('place-uuid-1');
+		svc.expandSheet();
+		expect(svc.sheetMode).toBe('full');
+
+		svc.collapseSheet();
+		expect(svc.sheetMode).toBe('peek');
+		// Place remains selected after collapse (sheet stays open in peek).
+		expect(svc.selectedPlaceId).toBe('place-uuid-1');
 	});
 });

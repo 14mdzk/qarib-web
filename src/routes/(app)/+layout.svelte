@@ -7,4 +7,4 @@
 </script>
 
 <AppHeader {mode} />
-<main class="mx-auto w-full max-w-2xl">{@render children()}</main>
+<main class="w-full">{@render children()}</main>
