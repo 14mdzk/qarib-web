@@ -15,7 +15,8 @@ export default ts.config(
 			'static/**',
 			'coverage/**',
 			'playwright-report/**',
-			'test-results/**'
+			'test-results/**',
+			'docs/**'
 		]
 	},
 	js.configs.recommended,

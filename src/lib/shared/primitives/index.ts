@@ -4,3 +4,8 @@ export { default as Card } from './card.svelte';
 export { default as Badge } from './badge.svelte';
 export { default as Skeleton } from './skeleton.svelte';
 export { default as BackButton } from './back-button.svelte';
+export { default as Spinner } from './spinner.svelte';
+export { default as ProgressStrip } from './progress-strip.svelte';
+export { default as GhostPin } from './ghost-pin.svelte';
+export { default as ContentDim } from './content-dim.svelte';
+export { default as MapToast } from './map-toast.svelte';

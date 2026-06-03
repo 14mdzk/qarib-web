@@ -91,5 +91,9 @@
 	"peta_view_toggle_label": "Pilih tampilan",
 	"peta_callout_open": "Buka kajian",
 	"peta_callout_close": "Tutup",
-	"peta_callout_untitled": "(Tanpa judul)"
+	"peta_callout_untitled": "(Tanpa judul)",
+	"loading_spinner_label": "Memuat",
+	"loading_progress_label": "Memuat",
+	"loading_ghost_pin_label": "Memuat peta",
+	"map_toast_loading_label": "Notifikasi peta"
 }
