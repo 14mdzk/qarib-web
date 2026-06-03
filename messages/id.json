@@ -95,5 +95,16 @@
 	"loading_spinner_label": "Memuat",
 	"loading_progress_label": "Memuat",
 	"loading_ghost_pin_label": "Memuat peta",
-	"map_toast_loading_label": "Notifikasi peta"
+	"map_toast_loading_label": "Notifikasi peta",
+	"pin_sheet_urgency_now": "SEKARANG",
+	"pin_sheet_urgency_soon": "SEGERA",
+	"pin_sheet_open_place": "Buka detail masjid",
+	"pin_sheet_day_today": "Hari ini",
+	"pin_sheet_day_tomorrow": "Besok",
+	"pin_sheet_day_this_week": "Minggu ini",
+	"pin_sheet_kajian_count": "{n} kajian",
+	"pin_sheet_expand": "Lihat semua kajian",
+	"pin_sheet_collapse": "Tutup",
+	"map_fab_gps_label": "Lokasiku",
+	"map_filter_chips_label": "Filter kajian di peta"
 }
