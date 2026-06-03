@@ -1,5 +1,5 @@
 /**
- * Pin urgency tiers for the Qarib map (Phase C).
+ * Pin urgency tiers for the Qarib map (Hi-Fi v2).
  *
  * Ported from `qarib-cms/resources/js/lib/services/pinTierService.ts` and
  * adapted to the web design token system. Each tier maps to a CSS custom
@@ -7,17 +7,17 @@
  * system rather than hard-coding colours.
  *
  * Tier rules (relative to `now`):
- *   - `now`   — starts in ≤ 30 min, or has already started (diff ≤ 30 min)
- *   - `soon`  — starts in ≤ 180 min (3 h)
- *   - `today` — anything later today
- *
- * Events beyond today are filtered upstream by the API (`date_from`/`date_to`
- * constraints), so this function only handles within-day buckets.
+ *   - `now`   — diff in [-120, 30] min: event started up to 2 h ago or starts
+ *               within 30 min. Long-past events fall through to today/later.
+ *   - `soon`  — diff in (30, 180] min (future only): event starts in 31–180 min.
+ *   - `today` — start falls on the same local calendar day as `now`.
+ *   - `later` — any other day.
  */
 
-export type PinTier = 'now' | 'soon' | 'today';
+export type PinTier = 'now' | 'soon' | 'today' | 'later';
 
-const NOW_THRESHOLD_MINUTES = 30;
+const NOW_UPPER_MINUTES = 30;
+const NOW_LOWER_MINUTES = -120;
 const SOON_THRESHOLD_MINUTES = 180;
 
 /**
@@ -31,29 +31,42 @@ export function deriveTier(dateStart: Date | string, now: Date = new Date()): Pi
 	const start = typeof dateStart === 'string' ? new Date(dateStart) : dateStart;
 	const diffMinutes = (start.getTime() - now.getTime()) / 60_000;
 
-	if (diffMinutes <= NOW_THRESHOLD_MINUTES) {
+	if (diffMinutes <= NOW_UPPER_MINUTES && diffMinutes >= NOW_LOWER_MINUTES) {
 		return 'now';
 	}
-	if (diffMinutes <= SOON_THRESHOLD_MINUTES) {
+	if (diffMinutes <= SOON_THRESHOLD_MINUTES && diffMinutes >= 0) {
 		return 'soon';
 	}
-	return 'today';
+	// Same calendar day (LOCAL time) → today; any other day → later.
+	// WIB users are UTC+7; evening sessions (Maghrib/Isha) near local midnight
+	// would be mis-bucketed if we compare UTC dates instead of local dates.
+	if (
+		start.getFullYear() === now.getFullYear() &&
+		start.getMonth() === now.getMonth() &&
+		start.getDate() === now.getDate()
+	) {
+		return 'today';
+	}
+	return 'later';
 }
 
 /**
  * Map a pin tier to a CSS custom property token from `app.css`.
  *
- * `now`   → `--color-primary`   (most urgent, highest visual weight)
- * `soon`  → `--color-accent`    (approaching, warm highlight)
- * `today` → `--color-content-3` (later today, muted)
+ * `now`   → `--color-pin-now`   (#e88b2e — orange, most urgent)
+ * `soon`  → `--color-pin-soon`  (#fce4c7 — warm cream)
+ * `today` → `--color-pin-today` (#fdfaf4 — paper white)
+ * `later` → `--color-pin-later` (#a89e8e — muted ink-4)
  */
 export function tierToTokenColor(tier: PinTier): string {
 	switch (tier) {
 		case 'now':
-			return 'var(--color-primary)';
+			return 'var(--color-pin-now)';
 		case 'soon':
-			return 'var(--color-accent)';
+			return 'var(--color-pin-soon)';
 		case 'today':
-			return 'var(--color-content-3)';
+			return 'var(--color-pin-today)';
+		case 'later':
+			return 'var(--color-pin-later)';
 	}
 }
