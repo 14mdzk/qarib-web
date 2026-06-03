@@ -309,6 +309,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/series/by-id/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get event series by UUID
+         * @description Returns the event series template for the given UUID. Public endpoint.
+         */
+        get: operations["getSeriesByID"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events/series/{slug}": {
         parameters: {
             query?: never;
@@ -1592,6 +1612,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"] & {
                         data?: components["schemas"]["EventRecurringResponse"];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSeriesByID: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+            };
+            header?: never;
+            path: {
+                /** @description Event series UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event series found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: components["schemas"]["EventSeriesResponse"];
                     };
                 };
             };

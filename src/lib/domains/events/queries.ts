@@ -17,14 +17,14 @@
  *   - rule .claude/rules/architecture.md   (queries.ts in domains/events/)
  *   - rule .claude/rules/state-management.md (server data in svelte-query)
  */
-import { createInfiniteQuery } from '@tanstack/svelte-query';
+import { createInfiniteQuery, createQuery } from '@tanstack/svelte-query';
 import { buildQueryOptions, defineQuery } from '$core/query';
 import { api } from '$core/api';
 import type { InfiniteData } from '@tanstack/svelte-query';
 import type { QueryClient } from '@tanstack/svelte-query';
 import type { Paginated, PaginationMeta } from '$core/api';
-import type { EventRecurringResponse } from './schema.js';
-import type { NearbyArgs, ListArgs, SeriesPaginatedArgs } from './service.js';
+import type { EventRecurringResponse, EventSeriesResponse } from './schema.js';
+import type { NearbyArgs, ListArgs, SeriesPaginatedArgs, SeriesByIdArgs } from './service.js';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -36,8 +36,10 @@ export const eventKeys = {
 	list: (args: ListArgs) => ['events', 'list', args] as const,
 	get: (id: number, expand?: string) => ['events', 'get', id, expand] as const,
 	series: (slug: string, expand?: string) => ['events', 'series', slug, expand] as const,
+	seriesById: (id: string, expand?: string) => ['events', 'seriesById', id, expand] as const,
 	seriesUpcoming: (args: SeriesPaginatedArgs) => ['events', 'seriesUpcoming', args] as const,
-	seriesRecurrings: (args: SeriesPaginatedArgs) => ['events', 'seriesRecurrings', args] as const
+	seriesRecurrings: (args: SeriesPaginatedArgs) => ['events', 'seriesRecurrings', args] as const,
+	occurrencesByEvent: (args: ListArgs) => ['events', 'occurrencesByEvent', args] as const
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -234,4 +236,66 @@ export function defineSeriesRecurringsQuery(
 	opts?: { enabled?: boolean; staleTime?: number; requestId?: string }
 ) {
 	return defineQuery('events.seriesRecurrings', args, opts);
+}
+
+/**
+ * Reactive event-series-by-UUID query (requires Svelte component context).
+ *
+ * Used by the `/kajian/[id]` route where the route param is a series UUID,
+ * not a slug. Single fetch (not infinite) — one series per detail page.
+ *
+ * Pass `queryClient` when `QueryClientProvider` is not yet in the layout context
+ * (same workaround as `defineNearbyInfiniteQuery`).
+ * TODO(phase-D): remove `queryClient` param once shared provider is wired.
+ */
+export function defineSeriesByIdQuery(
+	args: SeriesByIdArgs,
+	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	queryClient?: QueryClient
+) {
+	return createQuery<EventSeriesResponse | undefined>(
+		() => ({
+			queryKey: eventKeys.seriesById(args.id, args.expand),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('events.seriesById', args, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<EventSeriesResponse | undefined>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime
+		}),
+		queryClient ? () => queryClient : undefined
+	);
+}
+
+/**
+ * Reactive upcoming occurrences by event_id query (requires Svelte context).
+ *
+ * Used by the `/kajian/[id]` schedule strip — lists upcoming occurrences
+ * for a series keyed by the series UUID (`event_id` filter on `events.list`).
+ * Accepts `date_from` to start from today and a `limit` cap for the strip.
+ *
+ * Pass `queryClient` when `QueryClientProvider` is not yet in the layout context.
+ * TODO(phase-D): remove `queryClient` param once shared provider is wired.
+ */
+export function defineOccurrencesByEventQuery(
+	args: ListArgs,
+	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	queryClient?: QueryClient
+) {
+	return createQuery<Paginated<EventRecurringResponse[]>>(
+		() => ({
+			queryKey: eventKeys.occurrencesByEvent(args),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('events.list', args, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<EventRecurringResponse[]>>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime
+		}),
+		queryClient ? () => queryClient : undefined
+	);
 }
