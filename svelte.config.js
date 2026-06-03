@@ -8,6 +8,27 @@ const config = {
 	},
 	kit: {
 		adapter: adapter(),
+		/**
+		 * CSP managed here so SvelteKit can nonce its own inline bootstrap script
+		 * (the serialized server-load payload). Without this, `script-src 'self'`
+		 * in hooks.server.ts blocks that inline script in every environment,
+		 * preventing hydration. See ADR 0014.
+		 */
+		csp: {
+			mode: 'auto',
+			directives: {
+				'default-src': ["'self'"],
+				'script-src': ["'self'"],
+				'style-src': ["'self'", "'unsafe-inline'"],
+				'img-src': ["'self'", 'data:'],
+				'font-src': ["'self'", 'data:'],
+				'connect-src': ["'self'"],
+				'frame-ancestors': ["'none'"],
+				'base-uri': ["'self'"],
+				'form-action': ["'self'"],
+				'object-src': ["'none'"]
+			}
+		},
 		alias: {
 			$core: 'src/lib/core',
 			'$core/*': 'src/lib/core/*',

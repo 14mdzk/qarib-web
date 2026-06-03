@@ -1,16 +1,22 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import { m } from '$core/i18n';
 	import { Button } from '$lib/shared/primitives';
 	import LoadingState from '$lib/shared/composites/loading-state.svelte';
 	import EmptyState from '$lib/shared/composites/empty-state.svelte';
+	import MapView from '$lib/shared/composites/map-view.svelte';
 	import { toDateRange } from '$lib/shared/utils/date.js';
 	import { createLocation } from '$core/location/index.svelte.js';
 	import { createEventsView } from '$domains/events/store.svelte.js';
 	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
+	import { deriveTier } from '$domains/events/pin-tier.js';
 	import { buildQueryClient } from '$core/query';
 	import type { Paginated } from '$core/api';
-	import type { EventRecurringResponse } from '$domains/events/schema.js';
+	import type {
+		EventRecurringResponse,
+		EventRecurringResponseWithPlace
+	} from '$domains/events/schema.js';
 	import type { InfiniteData } from '@tanstack/svelte-query';
 	import EventCard from '$lib/domains/events/components/event-card.svelte';
 	import type { PageData } from './$types'; // merged from +page.server.ts load
@@ -99,6 +105,51 @@
 	// Derived flat list from all pages accumulated by the infinite query.
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
 
+	// ---------------------------------------------------------------------------
+	// Map pins — derived from events with valid place coordinates
+	// ---------------------------------------------------------------------------
+
+	const pins = $derived(
+		(events as EventRecurringResponseWithPlace[])
+			.filter(
+				(e) =>
+					e.id != null &&
+					e.date_start != null &&
+					e.place != null &&
+					typeof e.place.lat === 'number' &&
+					typeof e.place.lng === 'number' &&
+					!isNaN(e.place.lat) &&
+					!isNaN(e.place.lng)
+			)
+			.map((e) => ({
+				id: e.id,
+				lat: e.place.lat,
+				lng: e.place.lng,
+				tier: deriveTier(e.date_start)
+			}))
+	);
+
+	// Map center + userLocation derived from location store.
+	const mapCenter = $derived<[number, number]>([location.center.lat, location.center.lng]);
+	const userLocation = $derived<[number, number] | undefined>(
+		location.granted ? [location.center.lat, location.center.lng] : undefined
+	);
+
+	// ---------------------------------------------------------------------------
+	// Selected pin callout — the occurrence for the active pin ID
+	// ---------------------------------------------------------------------------
+
+	const selectedEvent = $derived(
+		eventsView.selectedPinId != null
+			? (events.find((e) => e.id === eventsView.selectedPinId) ?? null)
+			: null
+	);
+
+	function localise(l10n: Record<string, string> | null | undefined): string {
+		if (!l10n) return '';
+		return l10n['id'] ?? Object.values(l10n)[0] ?? '';
+	}
+
 	onMount(() => {
 		// requestGps() updates location.center on success → queryArgs changes →
 		// createInfiniteQuery re-fetches automatically (new queryKey).
@@ -125,8 +176,8 @@
 		{/each}
 	</div>
 
-	<!-- Location affordance -->
-	<div class="border-border flex items-center gap-2 border-b px-4 py-2">
+	<!-- Location affordance + view toggle -->
+	<div class="border-border flex items-center justify-between gap-2 border-b px-4 py-2">
 		<button
 			type="button"
 			onclick={() => location.requestGps()}
@@ -138,42 +189,125 @@
 		{#if location.granted}
 			<span class="text-content-3 text-xs">{m.peta_location_granted()}</span>
 		{/if}
+
+		<!-- Map / List segmented toggle -->
+		<div
+			class="bg-surface-2 border-border ml-auto flex shrink-0 overflow-hidden rounded-full border"
+			role="group"
+			aria-label={m.peta_view_toggle_label()}
+		>
+			<button
+				type="button"
+				onclick={() => eventsView.setViewMode('list')}
+				aria-pressed={eventsView.viewMode === 'list'}
+				class="px-3 py-1 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none {eventsView.viewMode ===
+				'list'
+					? 'bg-primary text-primary-foreground font-semibold'
+					: 'text-content-2 hover:bg-surface-3'}"
+			>
+				{m.peta_view_list()}
+			</button>
+			<button
+				type="button"
+				onclick={() => eventsView.setViewMode('map')}
+				aria-pressed={eventsView.viewMode === 'map'}
+				class="px-3 py-1 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none {eventsView.viewMode ===
+				'map'
+					? 'bg-primary text-primary-foreground font-semibold'
+					: 'text-content-2 hover:bg-surface-3'}"
+			>
+				{m.peta_view_map()}
+			</button>
+		</div>
 	</div>
 
-	<!-- Event list area -->
-	<div class="px-4 py-4">
-		{#if query.isPending}
-			<LoadingState />
-		{:else if query.isError}
-			<div class="flex flex-col items-center gap-3 py-12 text-center">
-				<p class="text-content font-medium">{m.peta_error_title()}</p>
-				<p class="text-content-3 text-sm">{m.peta_error_body()}</p>
-				<Button variant="outline" onclick={() => query.refetch()} size="sm">
-					{m.peta_load_more()}
-				</Button>
-			</div>
-		{:else if events.length === 0}
-			<EmptyState title={m.peta_empty_title()} description={m.peta_empty_body()} />
-		{:else}
-			<ul class="flex flex-col gap-3" role="list">
-				{#each events as event (event.id)}
-					<li>
-						<EventCard occurrence={event} />
-					</li>
-				{/each}
-			</ul>
+	<!-- Main content area: list or map -->
+	{#if eventsView.viewMode === 'map'}
+		<!-- Map view: fixed height container, MapView fills it -->
+		<div class="relative" style="height: calc(100dvh - 10rem);">
+			<MapView
+				center={mapCenter}
+				zoom={13}
+				{pins}
+				{userLocation}
+				onpinclick={(id) => {
+					eventsView.selectPin(typeof id === 'number' ? id : null);
+				}}
+			/>
 
-			{#if query.hasNextPage}
-				<div class="mt-4 flex justify-center">
-					<Button
-						variant="outline"
-						onclick={() => query.fetchNextPage()}
-						disabled={query.isFetchingNextPage}
-					>
-						{query.isFetchingNextPage ? m.peta_loading_more() : m.peta_load_more()}
-					</Button>
+			<!-- Pin callout overlay — shows when a pin is selected -->
+			<!-- eslint-disable svelte/no-navigation-without-resolve -- /kajian/[id] lands in C4; base+path is correct. TODO(c4): switch to resolve(). -->
+			{#if selectedEvent != null}
+				{@const calloutTitle = localise(selectedEvent.name)}
+				<div
+					class="border-border bg-surface absolute right-3 bottom-6 left-3 z-[1000] rounded-xl border p-4 shadow-lg"
+					role="dialog"
+					aria-modal="true"
+					aria-label={calloutTitle || m.peta_callout_untitled()}
+				>
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0 flex-1">
+							<p class="text-content line-clamp-2 leading-snug font-medium">
+								{calloutTitle || m.peta_callout_untitled()}
+							</p>
+						</div>
+						<button
+							type="button"
+							onclick={() => eventsView.selectPin(null)}
+							class="text-content-3 hover:text-content shrink-0 text-sm focus-visible:ring-2 focus-visible:outline-none"
+							aria-label={m.peta_callout_close()}
+						>
+							{m.peta_callout_close()}
+						</button>
+					</div>
+					<div class="mt-3">
+						<a
+							href="{base}/kajian/{selectedEvent.id}"
+							class="bg-primary text-primary-foreground focus-visible:ring-ring inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:outline-none"
+						>
+							{m.peta_callout_open()}
+						</a>
+					</div>
 				</div>
 			{/if}
-		{/if}
-	</div>
+			<!-- eslint-enable svelte/no-navigation-without-resolve -->
+		</div>
+	{:else}
+		<!-- List view (C3a — unchanged) -->
+		<div class="px-4 py-4">
+			{#if query.isPending}
+				<LoadingState />
+			{:else if query.isError}
+				<div class="flex flex-col items-center gap-3 py-12 text-center">
+					<p class="text-content font-medium">{m.peta_error_title()}</p>
+					<p class="text-content-3 text-sm">{m.peta_error_body()}</p>
+					<Button variant="outline" onclick={() => query.refetch()} size="sm">
+						{m.peta_load_more()}
+					</Button>
+				</div>
+			{:else if events.length === 0}
+				<EmptyState title={m.peta_empty_title()} description={m.peta_empty_body()} />
+			{:else}
+				<ul class="flex flex-col gap-3" role="list">
+					{#each events as event (event.id)}
+						<li>
+							<EventCard occurrence={event} />
+						</li>
+					{/each}
+				</ul>
+
+				{#if query.hasNextPage}
+					<div class="mt-4 flex justify-center">
+						<Button
+							variant="outline"
+							onclick={() => query.fetchNextPage()}
+							disabled={query.isFetchingNextPage}
+						>
+							{query.isFetchingNextPage ? m.peta_loading_more() : m.peta_load_more()}
+						</Button>
+					</div>
+				{/if}
+			{/if}
+		</div>
+	{/if}
 </div>
