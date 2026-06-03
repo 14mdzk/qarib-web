@@ -321,6 +321,24 @@ export const Endpoints = {
 	>({
 		method: 'GET',
 		path: (a) => `/api/upstream/places/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
+	}),
+
+	// ---------------------------------------------------------------------------
+	// Asatidz domain
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Single asatidz (Islamic scholar) by UUID.
+	 *
+	 * Used by the `/ustadz/[id]` route. Public endpoint — no auth required.
+	 */
+	'asatidz.get': defineEndpoint<
+		{ id: string; expand?: string },
+		void,
+		DataOf<Get200<'/asatidzs/{id}', 'get'>>
+	>({
+		method: 'GET',
+		path: (a) => `/api/upstream/asatidzs/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
 	})
 } as const;
 
