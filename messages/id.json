@@ -144,5 +144,16 @@
 	"ustadz_about_title": "Tentang",
 	"ustadz_kajian_section_title": "Kajian aktif",
 	"ustadz_kajian_count": "{n} unik",
-	"ustadz_share": "Bagikan"
+	"ustadz_share": "Bagikan",
+	"tema_not_found_title": "Tema tidak ditemukan",
+	"tema_not_found_body": "Tema ini tidak tersedia atau sudah dihapus.",
+	"tema_error_title": "Profil tema tidak bisa dimuat",
+	"tema_error_body": "Periksa sambunganmu lalu coba lagi.",
+	"tema_error_retry": "Coba lagi",
+	"tema_kicker": "Tema Kajian",
+	"tema_stat_kajian": "Kajian",
+	"tema_stat_ustadz": "Ustadz",
+	"tema_stat_masjid": "Masjid",
+	"tema_ustadz_section_title": "Ustadz yang mengajar tema ini",
+	"tema_kajian_section_title": "Jadwal mendatang"
 }
