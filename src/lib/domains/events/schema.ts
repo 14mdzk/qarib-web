@@ -103,6 +103,19 @@ export const NearbyEventSchema = z.object({
 export type NearbyEvent = z.infer<typeof NearbyEventSchema>;
 
 /**
+ * `EventRecurringResponse` with the expanded place shape guaranteed present
+ * and valid (lat + lng are numbers). Used by the map-pin derivation in
+ * `/peta` to avoid repeated inline intersection casts.
+ *
+ * Only valid after the `.filter()` guard that checks `place.lat`/`place.lng`.
+ */
+export type EventRecurringResponseWithPlace = EventRecurringResponse & {
+	id: number;
+	date_start: string;
+	place: ExpandedPlace;
+};
+
+/**
  * Parse an array of raw nearby occurrence items.
  * Throws a `ZodError` when any item fails validation.
  */

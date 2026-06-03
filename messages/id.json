@@ -85,5 +85,11 @@
 	"peta_error_body": "Kajian terdekat tidak dapat dimuat. Coba lagi.",
 	"peta_location_granted": "Lokasi aktif",
 	"peta_load_more": "Muat lebih banyak",
-	"peta_loading_more": "Memuat…"
+	"peta_loading_more": "Memuat…",
+	"peta_view_list": "Daftar",
+	"peta_view_map": "Peta",
+	"peta_view_toggle_label": "Pilih tampilan",
+	"peta_callout_open": "Buka kajian",
+	"peta_callout_close": "Tutup",
+	"peta_callout_untitled": "(Tanpa judul)"
 }

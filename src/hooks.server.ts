@@ -4,14 +4,20 @@
  * Stack (in execution order):
  *   1. requestIdHandle    — generate per-request id, attach to locals, echo header.
  *   2. paraglideHandle    — locale resolution + AsyncLocalStorage for messages.
- *   3. securityHandle     — apply CSP and other security headers (last so it sees the final response).
+ *   3. securityHandle     — apply non-CSP security headers (last so it sees the final response).
+ *
+ * CSP is now owned by `svelte.config.js kit.csp` (mode: 'auto') so SvelteKit
+ * can nonce its own inline bootstrap script on every request. Manually setting
+ * Content-Security-Policy here would override the nonce-bearing header that
+ * SvelteKit emits, re-breaking hydration. See ADR 0014.
  *
  * Conformance:
  *   - rule .claude/rules/observability.md  (request id minted here, echoed downstream)
- *   - rule .claude/rules/security.md       (CSP, Referrer-Policy, X-Content-Type-Options, …)
+ *   - rule .claude/rules/security.md       (Referrer-Policy, X-Content-Type-Options, …; CSP → kit.csp)
  *   - rule .claude/rules/i18n.md           (locale comes from cookie, defaults to `en`)
  *   - ADR 0009                             (no end-user auth; no session handle)
  *   - ADR 0012                             (BFF is a public read-through proxy)
+ *   - ADR 0014                             (CSP via SvelteKit nonces)
  */
 import { sequence } from '@sveltejs/kit/hooks';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
@@ -48,28 +54,16 @@ const paraglideHandle: Handle = ({ event, resolve }) =>
 	});
 
 /**
- * Apply security headers. Strict CSP per rule security.md.
+ * Apply non-CSP security headers.
  *
- * `style-src` includes `'unsafe-inline'` because Tailwind v4 + SvelteKit
- * inject critical CSS inline during SSR. Everything else is `'self'`.
+ * Content-Security-Policy is intentionally absent here: it is emitted by
+ * SvelteKit's `kit.csp` (svelte.config.js) which adds a per-request nonce to
+ * every inline `<script>` tag it generates. Overriding that header here would
+ * drop the nonce and re-break hydration (ADR 0014).
  */
 const securityHandle: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 
-	const csp = [
-		"default-src 'self'",
-		"script-src 'self'",
-		"style-src 'self' 'unsafe-inline'",
-		"img-src 'self' data:",
-		"font-src 'self' data:",
-		"connect-src 'self'",
-		"frame-ancestors 'none'",
-		"base-uri 'self'",
-		"form-action 'self'",
-		"object-src 'none'"
-	].join('; ');
-
-	response.headers.set('Content-Security-Policy', csp);
 	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
