@@ -118,5 +118,20 @@
 	"kajian_no_upcoming": "Belum ada sesi terjadwal",
 	"kajian_error_title": "Kajian tidak bisa dimuat",
 	"kajian_error_body": "Periksa sambunganmu lalu coba lagi.",
-	"kajian_error_retry": "Coba lagi"
+	"kajian_error_retry": "Coba lagi",
+	"masjid_not_found_title": "Masjid tidak ditemukan",
+	"masjid_not_found_body": "Masjid ini tidak tersedia atau sudah dihapus.",
+	"masjid_error_title": "Masjid tidak bisa dimuat",
+	"masjid_error_body": "Periksa sambunganmu lalu coba lagi.",
+	"masjid_error_retry": "Coba lagi",
+	"masjid_loading": "Memuat masjid…",
+	"masjid_region_chip_separator": " › ",
+	"masjid_directions": "Petunjuk arah",
+	"masjid_phone": "Telepon",
+	"masjid_share": "Bagikan",
+	"masjid_kajian_section_title": "Kajian rutin di sini",
+	"masjid_kajian_count": "{n} aktif",
+	"masjid_kajian_see_all": "Lihat semua jadwal masjid ini",
+	"masjid_map_aria_label": "Peta lokasi masjid",
+	"masjid_hero_image_alt": "Foto masjid"
 }
