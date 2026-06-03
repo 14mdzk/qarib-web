@@ -75,6 +75,26 @@
 	/* ── Color: green (success / secondary accent) ──────────────────────── */
 	--color-green: #4f8b5a;
 
+	/* ── Color: blue (links, user-location dot) ─────────────────────────── */
+	--color-blue: #3a6fa8;
+
+	/* ── Semantic pin-state tokens (map urgency system) ─────────────────── */
+	/*
+	 * NOW  = kajian sedang berlangsung  → orange
+	 * SOON = mulai dalam < 2 jam       → orange-100 (warm cream)
+	 * TODAY = dijadwalkan hari ini     → paper
+	 * LATER = lain hari                → ink-4 (muted)
+	 * DEFAULT = masjid tanpa kajian    → white
+	 *
+	 * Rule: styling.md — tokens are the single lever. Downstream slices use
+	 * bg-pin-now, bg-pin-soon, etc. — no arbitrary hex in components.
+	 */
+	--color-pin-now: #e88b2e;
+	--color-pin-soon: #fce4c7;
+	--color-pin-today: #fdfaf4;
+	--color-pin-later: #a89e8e;
+	--color-pin-default: #ffffff;
+
 	/* ── Semantic color tokens (light values) ───────────────────────────── */
 	/*
 	 * These are the single lever for surface/text/border/action across
@@ -175,9 +195,54 @@ html {
 	--color-accent: #f0b56a;
 }
 
+/* ─── Hi-Fi v2 loading animations ────────────────────────────────────────── */
+/*
+ * Verbatim port from Qarib Hi-Fi v2 CSS (docs/design/hifi-v2.html <style>).
+ * Rule: styling.md — tokens only; no arbitrary hex in components.
+ *
+ * shimmer    → .skel (skeleton loader warm gradient)
+ * spin       → .spinner (inline activity ring)
+ * stripe     → .progress-strip::after (top-bar progress stripe)
+ * ghost-pulse → .ghost-pin (map pin placeholder pulse)
+ */
+@keyframes shimmer {
+	0% {
+		background-position: -200% 0;
+	}
+	100% {
+		background-position: 200% 0;
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes stripe {
+	0% {
+		transform: translateX(-60%);
+	}
+	100% {
+		transform: translateX(260%);
+	}
+}
+
+@keyframes ghost-pulse {
+	0%,
+	100% {
+		opacity: 0.5;
+	}
+	50% {
+		opacity: 0.2;
+	}
+}
+
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */
 /*
- * Honor prefers-reduced-motion by zeroing all duration tokens.
+ * Honor prefers-reduced-motion by zeroing all duration tokens and
+ * neutralising the Hi-Fi v2 loading animations.
  * Rule: styling.md — "prefers-reduced-motion honored on motion-heavy components."
  */
 @media (prefers-reduced-motion: reduce) {
@@ -185,5 +250,13 @@ html {
 		--duration-fast: 0ms;
 		--duration-base: 0ms;
 		--duration-slow: 0ms;
+	}
+
+	/* Freeze shimmer, spin, stripe, ghost-pulse in place. */
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
 	}
 }
