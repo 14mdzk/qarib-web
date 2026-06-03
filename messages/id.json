@@ -133,5 +133,16 @@
 	"masjid_kajian_count": "{n} aktif",
 	"masjid_kajian_see_all": "Lihat semua jadwal masjid ini",
 	"masjid_map_aria_label": "Peta lokasi masjid",
-	"masjid_hero_image_alt": "Foto masjid"
+	"masjid_hero_image_alt": "Foto masjid",
+	"ustadz_not_found_title": "Ustadz tidak ditemukan",
+	"ustadz_not_found_body": "Ustadz ini tidak tersedia atau sudah dihapus.",
+	"ustadz_error_title": "Profil tidak bisa dimuat",
+	"ustadz_error_body": "Periksa sambunganmu lalu coba lagi.",
+	"ustadz_error_retry": "Coba lagi",
+	"ustadz_eyebrow": "Ustadz",
+	"ustadz_sub_line": "Pengajar tetap · {n} kajian aktif",
+	"ustadz_about_title": "Tentang",
+	"ustadz_kajian_section_title": "Kajian aktif",
+	"ustadz_kajian_count": "{n} unik",
+	"ustadz_share": "Bagikan"
 }
