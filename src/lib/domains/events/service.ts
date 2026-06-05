@@ -42,6 +42,15 @@ export interface ListArgs {
 	expand?: string;
 }
 
+export interface ListSeriesArgs {
+	place_id?: string;
+	asatidz_id?: string;
+	subject_id?: string;
+	limit?: number;
+	cursor?: string;
+	expand?: string;
+}
+
 export interface SeriesPaginatedArgs {
 	slug: string;
 	limit?: number;
@@ -144,4 +153,14 @@ export async function fetchSeriesById(
 	opts?: ApiCallOptions
 ): Promise<EventSeriesResponse | undefined> {
 	return api('events.seriesById', { id, expand }, undefined, opts);
+}
+
+/**
+ * List event series with filters (paginated).
+ */
+export async function fetchEventSeriesList(
+	args: ListSeriesArgs,
+	opts?: ApiCallOptions
+): Promise<Paginated<EventSeriesResponse[]>> {
+	return api('events.listSeries', args, undefined, opts);
 }

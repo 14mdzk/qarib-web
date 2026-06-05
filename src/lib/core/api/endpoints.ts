@@ -20,6 +20,9 @@ import type { Paginated } from './core-fetch.js';
 /** Shorthand for a single event occurrence from the generated schema. */
 type EventRecurringResponse = components['schemas']['EventRecurringResponse'];
 
+/** Shorthand for a single event series template from the generated schema. */
+type EventSeriesResponse = components['schemas']['EventSeriesResponse'];
+
 // ---------------------------------------------------------------------------
 // URL helper
 // ---------------------------------------------------------------------------
@@ -230,6 +233,33 @@ export const Endpoints = {
 				status: a.status,
 				date_from: a.date_from,
 				date_to: a.date_to,
+				limit: a.limit,
+				cursor: a.cursor,
+				expand: a.expand
+			})}`
+	}),
+
+	/**
+	 * List event series with filters (paginated).
+	 */
+	'events.listSeries': defineEndpoint<
+		{
+			place_id?: string;
+			asatidz_id?: string;
+			subject_id?: string;
+			limit?: number;
+			cursor?: string;
+			expand?: string;
+		},
+		void,
+		Paginated<EventSeriesResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/events/series${qs({
+				place_id: a.place_id,
+				asatidz_id: a.asatidz_id,
+				subject_id: a.subject_id,
 				limit: a.limit,
 				cursor: a.cursor,
 				expand: a.expand

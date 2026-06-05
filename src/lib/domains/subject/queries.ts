@@ -43,7 +43,12 @@ export const subjectKeys = {
  */
 export function defineSubjectByIdQuery(
 	args: GetByIdArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: SubjectResponse;
+	},
 	queryClient?: QueryClient
 ) {
 	return createQuery<SubjectResponse | undefined>(
@@ -56,7 +61,9 @@ export function defineSubjectByIdQuery(
 					baseUrl: ''
 				}) as Promise<SubjectResponse | undefined>,
 			enabled: opts?.enabled,
-			staleTime: opts?.staleTime
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
 		}),
 		queryClient ? () => queryClient : undefined
 	);

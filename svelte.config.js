@@ -45,6 +45,11 @@ const config = {
 			$messages: 'src/lib/generated/paraglide/messages.js',
 			'$messages/*': 'src/lib/generated/paraglide/*'
 		}
+	},
+	vite: {
+		ssr: {
+			noExternal: ['lucide-svelte', '@lucide/svelte']
+		}
 	}
 };
 

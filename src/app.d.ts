@@ -25,7 +25,12 @@ declare global {
 			locale: string;
 		}
 
-		// interface PageData {}
+		interface PageData {
+			meta?: {
+				title?: string;
+				description?: string;
+			};
+		}
 		// interface PageState {}
 		// interface Platform {}
 	}

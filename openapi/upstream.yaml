@@ -571,6 +571,48 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /events/series:
+    get:
+      operationId: listSeries
+      tags: [Events]
+      summary: List event series
+      description: |
+        Returns a cursor-paginated list of event series templates with their closest upcoming occurrence.
+        Supports filtering by place, asatidz, and subject. Public endpoint.
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/ExpandPlaceAsatidz"
+        - name: place_id
+          in: query
+          description: Filter by place UUID
+          schema:
+            type: string
+            format: uuid
+        - name: asatidz_id
+          in: query
+          description: Filter by asatidz UUID
+          schema:
+            type: string
+            format: uuid
+        - name: subject_id
+          in: query
+          description: Filter by subject UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Paginated list of event series
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedEventSeriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /events/series/by-id/{id}:
     get:
       operationId: getSeriesByID
@@ -1539,6 +1581,12 @@ components:
             - $ref: "#/components/schemas/AsatidzResponse"
           nullable: true
           description: Full asatidz object. Present only when `?expand=asatidz` is requested.
+        upcoming_occurrence:
+          allOf:
+            - $ref: "#/components/schemas/EventRecurringResponse"
+          nullable: true
+          description: Closest upcoming occurrence (if any).
+
 
     # ── Event Recurring (occurrence) ──────────────────────────────────────
     EventRecurringResponse:
@@ -1620,6 +1668,20 @@ components:
             Full asatidz object. Present only when `?expand=asatidz` is requested.
             Resolved from the occurrence's own asatidz_id if set, otherwise from
             the parent event series asatidz_id (effective ID).
+
+    PaginatedEventSeriesResponse:
+      type: object
+      required: [success, data, pagination]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventSeriesResponse"
+        pagination:
+          $ref: "#/components/schemas/PaginationMeta"
 
     PaginatedEventRecurringResponse:
       type: object

@@ -3,11 +3,10 @@
 	import { resolve } from '$app/paths';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { m } from '$core/i18n';
-	import { buildQueryClient } from '$core/query';
 	import { Skeleton } from '$lib/shared/primitives';
 	import EventCard from '$lib/domains/events/components/event-card.svelte';
 	import { defineSubjectByIdQuery } from '$domains/subject/queries.js';
-	import { defineOccurrencesByEventQuery } from '$domains/events/queries.js';
+	import { defineSeriesListQuery } from '$domains/events/queries.js';
 	import { deriveInitials } from '$lib/shared/utils/names.js';
 	import type { PageData } from './$types';
 
@@ -17,12 +16,6 @@
 	const id: string = page.params.id!;
 
 	// ---------------------------------------------------------------------------
-	// QueryClient — page-local until QueryClientProvider is wired in root layout.
-	// Same pattern as /ustadz. TODO(phase-D): replace with shared provider.
-	// ---------------------------------------------------------------------------
-	const qc = buildQueryClient({ staleTime: 60_000 });
-
-	// ---------------------------------------------------------------------------
 	// Svelte-query: subject header
 	// ---------------------------------------------------------------------------
 	const subjectQuery = defineSubjectByIdQuery(
@@ -30,23 +23,27 @@
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.subjectInitialData;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
 	// Svelte-query: kajian for this subject
 	// expand=place,asatidz so we can derive stat counts and ustadz carousel.
 	// ---------------------------------------------------------------------------
-	const kajianQuery = defineOccurrencesByEventQuery(
+	const kajianQuery = defineSeriesListQuery(
 		{ subject_id: id, expand: 'place,asatidz', limit: 30 },
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.kajianInitialData ?? undefined;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
@@ -66,25 +63,16 @@
 	/**
 	 * Stat row — derived from the loaded kajian list.
 	 *
-	 * Kajian count: total occurrences in the list.
-	 * Ustadz count: unique asatidz_id values (non-null) across occurrences.
-	 *   The occurrence carries asatidz_id (UUID) from its own override or
-	 *   the parent series. We dedupe by asatidz_id.
-	 * Masjid count: unique place_id values (non-null) across occurrences.
-	 *   Same derivation pattern as ustadz.
-	 *
-	 * NOTE: asatidz_id / place_id on EventRecurringResponse are the override IDs
-	 * (null when inherited from the series). When we expand=asatidz,place the
-	 * effective resolved objects are present on the occurrence. We use the
-	 * expanded objects' IDs for deduplication since they reflect effective values.
+	 * Kajian count: total series templates in the list.
+	 * Ustadz count: unique asatidz_id values (non-null) across series.
+	 * Masjid count: unique place_id values (non-null) across series.
 	 */
 	const statKajian = $derived(kajianList.length);
 
 	const statUstadz = $derived(() => {
 		const seen = new SvelteSet<string>();
-		for (const occ of kajianList) {
-			// Use expanded asatidz.id when available (effective, resolved ID).
-			const aid = occ.asatidz?.id ?? occ.asatidz_id ?? null;
+		for (const series of kajianList) {
+			const aid = series.asatidz?.id ?? series.asatidz_id ?? null;
 			if (aid) seen.add(aid);
 		}
 		return seen.size;
@@ -92,9 +80,8 @@
 
 	const statMasjid = $derived(() => {
 		const seen = new SvelteSet<string>();
-		for (const occ of kajianList) {
-			// Use expanded place.id when available (effective, resolved ID).
-			const pid = occ.place?.id ?? occ.place_id ?? null;
+		for (const series of kajianList) {
+			const pid = series.place?.id ?? series.place_id ?? null;
 			if (pid) seen.add(pid);
 		}
 		return seen.size;
@@ -105,14 +92,13 @@
 	 *
 	 * Each item carries: id (for the /ustadz/[id] link) and display name.
 	 * Derived from the expanded asatidz objects present on the kajian list.
-	 * If the expanded object is absent, the occurrence is skipped (no name to show).
 	 */
 	const uniqueUstadzList = $derived(() => {
 		const seen = new SvelteSet<string>();
 		const result: Array<{ id: string; name: string }> = [];
-		for (const occ of kajianList) {
-			const asatidz = occ.asatidz;
-			const aid = asatidz?.id ?? occ.asatidz_id ?? null;
+		for (const series of kajianList) {
+			const asatidz = series.asatidz;
+			const aid = asatidz?.id ?? series.asatidz_id ?? null;
 			if (!aid || seen.has(aid)) continue;
 			seen.add(aid);
 			// Display name: prefer expanded asatidz name, fall back to id fragment.
@@ -140,20 +126,20 @@
 	{#if isLoading}
 		<!-- Loading skeleton mirrors the v2 SubjectDetail structure -->
 		<div class="flex flex-col gap-4 pt-6">
-			<Skeleton class="rounded-radius h-4 w-24" />
-			<Skeleton class="rounded-radius h-8 w-3/4" />
-			<Skeleton class="rounded-radius h-14 w-full" />
-			<Skeleton class="rounded-radius mt-2 h-16 w-full" />
-			<Skeleton class="rounded-radius h-10 w-full" />
-			<Skeleton class="rounded-radius h-20 w-full" />
-			<Skeleton class="rounded-radius h-20 w-full" />
+			<Skeleton class="h-4 w-24 rounded" />
+			<Skeleton class="h-8 w-3/4 rounded" />
+			<Skeleton class="h-14 w-full rounded" />
+			<Skeleton class="mt-2 h-16 w-full rounded" />
+			<Skeleton class="h-10 w-full rounded" />
+			<Skeleton class="h-20 w-full rounded" />
+			<Skeleton class="h-20 w-full rounded" />
 		</div>
 	{:else if isError}
 		<div class="py-10 text-center">
 			<p class="text-ink font-bold">{m.tema_error_title()}</p>
 			<p class="text-ink-3 mt-1 text-sm">{m.tema_error_body()}</p>
 			<button
-				class="bg-ink text-paper rounded-radius mt-4 px-4 py-2 text-sm font-semibold"
+				class="bg-ink text-paper mt-4 rounded px-4 py-2 text-sm font-semibold"
 				onclick={() => subjectQuery.refetch()}
 			>
 				{m.tema_error_retry()}
@@ -197,7 +183,7 @@
 				SubjectResponse has no aggregate fields — this is a flag: derived from kajian list.
 			-->
 			<div
-				class="border-line rounded-radius flex items-center justify-around border bg-[var(--color-paper-2)] py-4"
+				class="border-line flex items-center justify-around rounded border bg-[var(--color-paper-2)] py-4"
 				data-testid="stat-row"
 			>
 				<div class="flex flex-col items-center gap-0.5" data-testid="stat-kajian">
@@ -245,7 +231,7 @@
 							-->
 							<a
 								href={resolve('/(app)/ustadz/[id]', { id: ustadz.id })}
-								class="border-line bg-paper hover:bg-paper-2 rounded-radius-sm flex items-center gap-2 border px-2.5 py-1.5 transition-colors"
+								class="border-line bg-paper hover:bg-paper-2 flex items-center gap-2 rounded-sm border px-2.5 py-1.5 transition-colors"
 								data-testid="ustadz-mini-chip"
 							>
 								<!-- Initials circle -->
@@ -275,15 +261,10 @@
 				</div>
 
 				<div class="flex flex-col gap-2">
-					{#each kajianList as occurrence (occurrence.id)}
-						<!--
-							EventCard links to /kajian/{occurrence.event_id} (series UUID).
-							The component derives `eventId` from `occurrence.event_id` internally
-							and uses resolve('/(app)/kajian/[id]', { id: eventId }) for the href.
-						-->
-						<EventCard {occurrence} />
+					{#each kajianList as series (series.id)}
+						<EventCard {series} hideSubjectLink={true} />
 					{:else}
-						<div class="border-line rounded-radius border p-4 text-center">
+						<div class="border-line rounded border p-4 text-center">
 							<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
 						</div>
 					{/each}

@@ -1,24 +1,18 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { m } from '$core/i18n';
-	import { buildQueryClient } from '$core/query';
 	import { Skeleton } from '$lib/shared/primitives';
-	import EventCard from '$lib/domains/events/components/event-card.svelte';
+	import EventCard from './EventCard.svelte';
 	import { defineAsatidzByIdQuery } from '$domains/asatidz/queries.js';
-	import { defineOccurrencesByEventQuery } from '$domains/events/queries.js';
+	import { defineSeriesListQuery } from '$domains/events/queries.js';
 	import { deriveInitials } from '$lib/shared/utils/names.js';
 	import type { PageData } from './$types';
+	import { l10n } from '$shared/utils/l10n';
 
 	let { data }: { data: PageData } = $props();
 
 	// Route param: asatidz UUID.
 	const id: string = page.params.id!;
-
-	// ---------------------------------------------------------------------------
-	// QueryClient — page-local until QueryClientProvider is wired in root layout.
-	// Same pattern as /masjid. TODO(phase-D): replace with shared provider.
-	// ---------------------------------------------------------------------------
-	const qc = buildQueryClient({ staleTime: 60_000 });
 
 	// ---------------------------------------------------------------------------
 	// Svelte-query: asatidz header
@@ -28,22 +22,26 @@
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.asatidzInitialData;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
 	// Svelte-query: kajian for this asatidz
 	// ---------------------------------------------------------------------------
-	const kajianQuery = defineOccurrencesByEventQuery(
+	const kajianQuery = defineSeriesListQuery(
 		{ asatidz_id: id, expand: 'place', limit: 20 },
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.kajianInitialData ?? undefined;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
@@ -53,13 +51,6 @@
 	const kajianList = $derived(kajianQuery.data?.data ?? []);
 	const isLoading = $derived(asatidzQuery.isPending);
 	const isError = $derived(asatidzQuery.isError);
-
-	/** Localise an L10nString (id first, then first available). */
-	function l10n(map: Record<string, string> | null | undefined): string {
-		if (!map) return '';
-		return map['id'] ?? Object.values(map)[0] ?? '';
-	}
-
 	/**
 	 * Display name: prefer alias_name if present, fall back to name.
 	 * Both are L10nString.
@@ -101,16 +92,16 @@
 			<Skeleton class="h-4 w-16" />
 			<Skeleton class="h-8 w-2/3" />
 			<Skeleton class="h-4 w-1/2" />
-			<Skeleton class="rounded-radius mt-2 h-24 w-full" />
-			<Skeleton class="rounded-radius h-20 w-full" />
-			<Skeleton class="rounded-radius h-20 w-full" />
+			<Skeleton class="mt-2 h-24 w-full rounded" />
+			<Skeleton class="h-20 w-full rounded" />
+			<Skeleton class="h-20 w-full rounded" />
 		</div>
 	{:else if isError}
 		<div class="py-10 text-center">
 			<p class="text-ink font-bold">{m.ustadz_error_title()}</p>
 			<p class="text-ink-3 mt-1 text-sm">{m.ustadz_error_body()}</p>
 			<button
-				class="bg-ink text-paper rounded-radius mt-4 px-4 py-2 text-sm font-semibold"
+				class="bg-ink text-paper mt-4 rounded px-4 py-2 text-sm font-semibold"
 				onclick={() => asatidzQuery.refetch()}
 			>
 				{m.ustadz_error_retry()}
@@ -159,7 +150,7 @@
 			<!-- "Tentang" about block — only when bio text is available -->
 			{#if bioText}
 				<div
-					class="border-line rounded-radius border bg-[var(--color-paper-2)] p-3.5"
+					class="border-line rounded border bg-[var(--color-paper-2)] p-3.5"
 					data-testid="ustadz-about"
 				>
 					<div class="text-ink-3 mb-1.5 text-[10.5px] font-bold tracking-widest uppercase">
@@ -190,16 +181,11 @@
 					{/if}
 				</div>
 
-				<div class="flex flex-col gap-2">
-					{#each kajianList as occurrence (occurrence.id)}
-						<!--
-							EventCard links to /kajian/{occurrence.event_id} (series UUID).
-							The component uses `occurrence.event_id` via its internal `eventId`
-							derived value — already links by event_id, not occurrence integer id.
-						-->
-						<EventCard {occurrence} />
+				<div class="flex flex-col gap-3">
+					{#each kajianList as series (series.id)}
+						<EventCard {series} />
 					{:else}
-						<div class="border-line rounded-radius border p-4 text-center">
+						<div class="border-line rounded border p-4 text-center">
 							<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
 						</div>
 					{/each}

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { m } from '$core/i18n';
-	import { buildQueryClient } from '$core/query';
 	import { Skeleton } from '$lib/shared/primitives';
 	import { defineSeriesByIdQuery, defineOccurrencesByEventQuery } from '$domains/events/queries.js';
 	import { prayerIntToLabel } from '$lib/shared/utils/prayer.js';
@@ -17,12 +16,6 @@
 	const id: string = page.params.id!;
 
 	// ---------------------------------------------------------------------------
-	// QueryClient — page-local until QueryClientProvider is wired in root layout.
-	// Same pattern as /peta. TODO(phase-D): replace with shared provider.
-	// ---------------------------------------------------------------------------
-	const qc = buildQueryClient({ staleTime: 60_000 });
-
-	// ---------------------------------------------------------------------------
 	// Svelte-query: series header (single fetch, not infinite)
 	// ---------------------------------------------------------------------------
 	// `data.requestId` is captured via a reactive getter to satisfy Svelte 5's
@@ -32,9 +25,11 @@
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.seriesInitialData;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
@@ -46,9 +41,11 @@
 		{
 			get requestId() {
 				return data.requestId;
+			},
+			get initialData() {
+				return data.occurrencesInitialData ?? undefined;
 			}
-		},
-		qc
+		}
 	);
 
 	// ---------------------------------------------------------------------------
@@ -171,18 +168,18 @@
 	{#if isLoading}
 		<!-- Loading skeleton mirrors the v2 EventDetail structure -->
 		<div class="flex flex-col gap-4 pt-4">
-			<Skeleton class="rounded-radius h-8 w-3/4" />
-			<Skeleton class="rounded-radius h-4 w-1/2" />
-			<Skeleton class="rounded-radius mt-2 h-28" />
-			<Skeleton class="rounded-radius h-24" />
-			<Skeleton class="rounded-radius h-20" />
+			<Skeleton class="h-8 w-3/4 rounded" />
+			<Skeleton class="h-4 w-1/2 rounded" />
+			<Skeleton class="mt-2 h-28 rounded" />
+			<Skeleton class="h-24 rounded" />
+			<Skeleton class="h-20 rounded" />
 		</div>
 	{:else if isError}
 		<div class="py-10 text-center">
 			<p class="text-ink font-bold">{m.kajian_error_title()}</p>
 			<p class="text-ink-3 mt-1 text-sm">{m.kajian_error_body()}</p>
 			<button
-				class="bg-ink text-paper rounded-radius mt-4 px-4 py-2 text-sm font-semibold"
+				class="bg-ink text-paper mt-4 rounded px-4 py-2 text-sm font-semibold"
 				onclick={() => seriesQuery.refetch()}
 			>
 				{m.kajian_error_retry()}
@@ -194,7 +191,7 @@
 			<div class="mb-2 flex flex-wrap gap-1.5">
 				{#if series.date_rule}
 					<span
-						class="rounded-radius-sm border border-orange-100 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700"
+						class="rounded-sm border border-orange-100 bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700"
 						>🔁 {recurrenceLabel(series.date_rule)}</span
 					>
 				{/if}
@@ -217,7 +214,7 @@
 			<!-- Next session card (v2: .next-session) -->
 			{#if nextSession}
 				<div
-					class="rounded-radius border border-orange-100 bg-white p-3.5 shadow-sm"
+					class="rounded border border-orange-100 bg-white p-3.5 shadow-sm"
 					aria-label={m.kajian_next_session_label()}
 					data-testid="next-session-card"
 				>
@@ -237,7 +234,7 @@
 					<div class="mt-3 flex gap-2">
 						<!-- TODO(phase-E): wire ICS generation; calendar add is a placeholder -->
 						<button
-							class="bg-orange text-paper rounded-radius-sm flex flex-1 items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold opacity-60"
+							class="bg-orange text-paper flex flex-1 items-center justify-center gap-1.5 rounded-sm px-4 py-2 text-sm font-semibold opacity-60"
 							aria-label={m.kajian_add_to_calendar()}
 							disabled
 						>
@@ -265,7 +262,7 @@
 								href="https://maps.google.com/?q={place.lat},{place.lng}"
 								target="_blank"
 								rel="noopener noreferrer"
-								class="border-line bg-paper-2 text-ink rounded-radius-sm flex h-[42px] w-[42px] shrink-0 items-center justify-center border"
+								class="border-line bg-paper-2 text-ink flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-sm border"
 								aria-label={m.kajian_directions()}
 							>
 								<svg
@@ -282,7 +279,7 @@
 							</a>
 						{/if}
 						<button
-							class="border-line bg-paper-2 text-ink rounded-radius-sm flex h-[42px] w-[42px] shrink-0 items-center justify-center border"
+							class="border-line bg-paper-2 text-ink flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-sm border"
 							aria-label={m.kajian_share()}
 							onclick={() => {
 								if (typeof navigator !== 'undefined' && navigator.share) {
@@ -318,7 +315,7 @@
 					</div>
 				</div>
 			{:else}
-				<div class="border-line rounded-radius border p-4 text-center">
+				<div class="border-line rounded border p-4 text-center">
 					<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
 				</div>
 			{/if}
@@ -328,7 +325,7 @@
 				<div class="text-ink-3 mb-2 text-[11px] font-bold tracking-widest uppercase">
 					{m.kajian_where_who()}
 				</div>
-				<div class="border-line bg-paper rounded-radius overflow-hidden border">
+				<div class="border-line bg-paper overflow-hidden rounded border">
 					<!-- Place row -->
 					{#if place || placeId}
 						<!-- eslint-disable svelte/no-navigation-without-resolve -- TODO(phase-D): /masjid route lands later -->
@@ -340,7 +337,7 @@
 						>
 							<!-- TODO(phase-D2): place/ustadz routes — links resolve to intended paths when routes land -->
 							<div
-								class="rounded-radius-sm flex h-11 w-11 shrink-0 items-center justify-center bg-orange-50 text-lg font-bold text-orange-700"
+								class="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-orange-50 text-lg font-bold text-orange-700"
 							>
 								🕌
 							</div>
@@ -446,7 +443,7 @@
 				</div>
 				<!-- TODO(phase-E): open full calendar modal on click -->
 				<button
-					class="border-line bg-paper-2 text-ink rounded-radius-sm mt-2.5 flex w-full items-center justify-center gap-1.5 border py-2 text-sm font-semibold"
+					class="border-line bg-paper-2 text-ink mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-sm border py-2 text-sm font-semibold"
 				>
 					<svg
 						width="15"
@@ -487,7 +484,7 @@
 				href={waShareUrl()}
 				target="_blank"
 				rel="noopener noreferrer"
-				class="rounded-radius flex w-full items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white"
+				class="flex w-full items-center justify-center gap-2 rounded py-2.5 text-sm font-semibold text-white"
 				style="background: #25D366;"
 				aria-label={m.kajian_share_whatsapp()}
 			>

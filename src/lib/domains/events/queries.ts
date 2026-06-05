@@ -24,7 +24,13 @@ import type { InfiniteData } from '@tanstack/svelte-query';
 import type { QueryClient } from '@tanstack/svelte-query';
 import type { Paginated, PaginationMeta } from '$core/api';
 import type { EventRecurringResponse, EventSeriesResponse } from './schema.js';
-import type { NearbyArgs, ListArgs, SeriesPaginatedArgs, SeriesByIdArgs } from './service.js';
+import type {
+	NearbyArgs,
+	ListArgs,
+	SeriesPaginatedArgs,
+	SeriesByIdArgs,
+	ListSeriesArgs
+} from './service.js';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -39,7 +45,8 @@ export const eventKeys = {
 	seriesById: (id: string, expand?: string) => ['events', 'seriesById', id, expand] as const,
 	seriesUpcoming: (args: SeriesPaginatedArgs) => ['events', 'seriesUpcoming', args] as const,
 	seriesRecurrings: (args: SeriesPaginatedArgs) => ['events', 'seriesRecurrings', args] as const,
-	occurrencesByEvent: (args: ListArgs) => ['events', 'occurrencesByEvent', args] as const
+	occurrencesByEvent: (args: ListArgs) => ['events', 'occurrencesByEvent', args] as const,
+	listSeries: (args: ListSeriesArgs) => ['events', 'listSeries', args] as const
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -250,7 +257,12 @@ export function defineSeriesRecurringsQuery(
  */
 export function defineSeriesByIdQuery(
 	args: SeriesByIdArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: EventSeriesResponse;
+	},
 	queryClient?: QueryClient
 ) {
 	return createQuery<EventSeriesResponse | undefined>(
@@ -263,7 +275,9 @@ export function defineSeriesByIdQuery(
 					baseUrl: ''
 				}) as Promise<EventSeriesResponse | undefined>,
 			enabled: opts?.enabled,
-			staleTime: opts?.staleTime
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
 		}),
 		queryClient ? () => queryClient : undefined
 	);
@@ -281,7 +295,12 @@ export function defineSeriesByIdQuery(
  */
 export function defineOccurrencesByEventQuery(
 	args: ListArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: Paginated<EventRecurringResponse[]>;
+	},
 	queryClient?: QueryClient
 ) {
 	return createQuery<Paginated<EventRecurringResponse[]>>(
@@ -294,7 +313,40 @@ export function defineOccurrencesByEventQuery(
 					baseUrl: ''
 				}) as Promise<Paginated<EventRecurringResponse[]>>,
 			enabled: opts?.enabled,
-			staleTime: opts?.staleTime
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+		}),
+		queryClient ? () => queryClient : undefined
+	);
+}
+
+/**
+ * Reactive list event series query.
+ */
+export function defineSeriesListQuery(
+	args: ListSeriesArgs,
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: Paginated<EventSeriesResponse[]>;
+	},
+	queryClient?: QueryClient
+) {
+	return createQuery<Paginated<EventSeriesResponse[]>>(
+		() => ({
+			queryKey: eventKeys.listSeries(args),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('events.listSeries', args, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<EventSeriesResponse[]>>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
 		}),
 		queryClient ? () => queryClient : undefined
 	);
