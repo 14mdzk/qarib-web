@@ -13,6 +13,7 @@
 	 */
 	import Spinner from '$lib/shared/primitives/spinner.svelte';
 	import { m } from '$core/i18n';
+	import { Locate } from '@lucide/svelte';
 
 	interface Props {
 		onlocate?: () => void;
@@ -20,9 +21,6 @@
 	}
 
 	let { onlocate, loading = false }: Props = $props();
-
-	// GPS SVG — verbatim from v2 spec `i.gps`
-	const GPS_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`;
 </script>
 
 <!--
@@ -41,8 +39,7 @@
 	{#if loading}
 		<Spinner size="sm" />
 	{:else}
-		<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
-		{@html GPS_SVG}
+		<Locate class="text-primary/60 size-6" />
 	{/if}
 </button>
 
@@ -63,7 +60,7 @@
 		place-items: center;
 		color: var(--color-ink);
 		cursor: pointer;
-		z-index: 20;
+		z-index: 999;
 	}
 
 	.map-fab:hover:not(:disabled) {

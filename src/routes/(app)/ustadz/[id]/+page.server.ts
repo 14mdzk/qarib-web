@@ -19,13 +19,15 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { api, ApiError } from '$core/api';
+import type { AsatidzResponse } from '$lib/domains/asatidz/schema';
+import { l10n } from '$shared/utils/l10n';
 
 export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 	const { id } = params;
 	const requestId = locals.requestId;
 
 	// Fetch the asatidz — 404 → surface as SvelteKit 404.
-	let asatidzInitialData;
+	let asatidzInitialData: AsatidzResponse;
 	try {
 		asatidzInitialData = await api('asatidz.get', { id, expand: '' }, undefined, {
 			fetch,
@@ -47,11 +49,11 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 	let kajianInitialData = null;
 	try {
 		kajianInitialData = await api(
-			'events.list',
+			'events.listSeries',
 			{
 				asatidz_id: id,
 				expand: 'place',
-				limit: 20
+				limit: 3
 			},
 			undefined,
 			{ fetch, baseUrl: '', requestId }
@@ -60,5 +62,11 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 		// Non-fatal — kajian section renders empty; client re-fetches.
 	}
 
-	return { asatidzInitialData, kajianInitialData };
+	return {
+		asatidzInitialData,
+		kajianInitialData,
+		meta: {
+			title: l10n(asatidzInitialData.name)
+		}
+	};
 };

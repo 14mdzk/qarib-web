@@ -43,7 +43,7 @@ export const placeKeys = {
  */
 export function definePlaceByIdQuery(
 	args: GetByIdArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	opts?: { enabled?: boolean; staleTime?: number; requestId?: string; initialData?: PlaceResponse },
 	queryClient?: QueryClient
 ) {
 	return createQuery<PlaceResponse | undefined>(
@@ -56,7 +56,9 @@ export function definePlaceByIdQuery(
 					baseUrl: ''
 				}) as Promise<PlaceResponse | undefined>,
 			enabled: opts?.enabled,
-			staleTime: opts?.staleTime
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
 		}),
 		queryClient ? () => queryClient : undefined
 	);

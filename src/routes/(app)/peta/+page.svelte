@@ -16,7 +16,6 @@
 	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
 	import { groupOccurrencesToPlacePins } from '$domains/events/place-pins.js';
-	import { buildQueryClient } from '$core/query';
 	import type { Paginated } from '$core/api';
 	import type {
 		EventRecurringResponse,
@@ -24,6 +23,7 @@
 	} from '$domains/events/schema.js';
 	import type { InfiniteData } from '@tanstack/svelte-query';
 	import type { PageData } from './$types';
+	import { GlobeOff, Map } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -33,10 +33,6 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
-
-	// QueryClient — created page-locally until QueryClientProvider is wired in
-	// a root layout (no singleton; each page instance owns its own client).
-	const qc = buildQueryClient({ staleTime: 30_000 });
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
@@ -80,18 +76,15 @@
 	// SSR seed
 	const _initData = $derived(data.initialData as Paginated<EventRecurringResponse[]> | null);
 
-	const query = defineNearbyInfiniteQuery(
-		() => ({
-			args: queryArgs,
-			initialData: _initData
-				? ({
-						pages: [_initData],
-						pageParams: [null]
-					} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
-				: undefined
-		}),
-		qc
-	);
+	const query = defineNearbyInfiniteQuery(() => ({
+		args: queryArgs,
+		initialData: _initData
+			? ({
+					pages: [_initData],
+					pageParams: [null]
+				} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
+			: undefined
+	}));
 
 	// Derived flat list from all pages.
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
@@ -254,7 +247,7 @@
 				}}
 			/>
 		</ContentDim>
-	{:else}
+	{:else if !query.isError}
 		<MapView
 			center={mapCenter}
 			zoom={13}
@@ -292,23 +285,13 @@
 	<!-- Error state: in-map error card -->
 	{#if query.isError}
 		<div
-			class="absolute inset-x-4 top-1/2 z-30 -translate-y-1/2 rounded-[14px] bg-white p-6 text-center shadow-xl"
+			class="absolute inset-x-4 top-1/2 z-30 z-[999] -translate-y-1/2 rounded-[14px] bg-white p-6 text-center shadow-xl"
 		>
 			<div
 				class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full"
 				style="background: var(--color-danger-bg); color: var(--color-danger-ink);"
 			>
-				<svg
-					width="22"
-					height="22"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-				>
-					<path d="m2 2 20 20M10.7 5.3 15 3v15M9 5v15l-6 2V7l3.8-1.3M21 15l-6 3M3 17l6-2" />
-				</svg>
+				<GlobeOff />
 			</div>
 			<p class="mb-1 text-sm font-bold" style="color: var(--color-ink);">
 				{m.peta_map_error_title()}
@@ -333,18 +316,7 @@
 				class="mx-auto mb-3 grid h-[52px] w-[52px] place-items-center rounded-full border shadow-md"
 				style="background: white; border-color: var(--color-line); color: var(--color-ink-3);"
 			>
-				<svg
-					width="26"
-					height="26"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="1.8"
-					stroke-linecap="round"
-				>
-					<circle cx="11" cy="11" r="7" />
-					<path d="m21 21-4.3-4.3M8 11h6" />
-				</svg>
+				<Map class="size-6" />
 			</div>
 			<p class="mb-1 text-sm font-bold" style="color: var(--color-ink);">
 				{m.peta_map_empty_title()}

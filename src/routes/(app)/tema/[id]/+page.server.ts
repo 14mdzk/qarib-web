@@ -48,7 +48,7 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 	let kajianInitialData = null;
 	try {
 		kajianInitialData = await api(
-			'events.list',
+			'events.listSeries',
 			{
 				subject_id: id,
 				expand: 'place,asatidz',
