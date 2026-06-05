@@ -43,7 +43,12 @@ export const asatidzKeys = {
  */
 export function defineAsatidzByIdQuery(
 	args: GetByIdArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string },
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: AsatidzResponse;
+	},
 	queryClient?: QueryClient
 ) {
 	return createQuery<AsatidzResponse | undefined>(
@@ -56,7 +61,9 @@ export function defineAsatidzByIdQuery(
 					baseUrl: ''
 				}) as Promise<AsatidzResponse | undefined>,
 			enabled: opts?.enabled,
-			staleTime: opts?.staleTime
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
 		}),
 		queryClient ? () => queryClient : undefined
 	);

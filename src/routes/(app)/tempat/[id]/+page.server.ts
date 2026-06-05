@@ -47,7 +47,7 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 	let kajianInitialData = null;
 	try {
 		kajianInitialData = await api(
-			'events.list',
+			'events.listSeries',
 			{
 				place_id: id,
 				expand: 'asatidz',
@@ -60,5 +60,5 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 		// Non-fatal — kajian section renders empty; client re-fetches.
 	}
 
-	return { placeInitialData, kajianInitialData };
+	return { placeInitialData, kajianInitialData, meta: { title: 'Tempat' } };
 };

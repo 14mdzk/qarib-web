@@ -304,7 +304,7 @@
 		border-top-left-radius: 20px;
 		border-top-right-radius: 20px;
 		box-shadow: var(--shadow-lg);
-		z-index: 15;
+		z-index: 999;
 		display: flex;
 		flex-direction: column;
 		transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);

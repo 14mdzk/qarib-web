@@ -309,6 +309,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List event series
+         * @description Returns a cursor-paginated list of event series templates with their closest upcoming occurrence.
+         *     Supports filtering by place, asatidz, and subject. Public endpoint.
+         */
+        get: operations["listSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events/series/by-id/{id}": {
         parameters: {
             query?: never;
@@ -837,6 +858,8 @@ export interface components {
             place?: components["schemas"]["PlaceResponse"] | null;
             /** @description Full asatidz object. Present only when `?expand=asatidz` is requested. */
             asatidz?: components["schemas"]["AsatidzResponse"] | null;
+            /** @description Closest upcoming occurrence (if any). */
+            upcoming_occurrence?: components["schemas"]["EventRecurringResponse"] | null;
         };
         EventRecurringResponse: {
             /**
@@ -896,6 +919,12 @@ export interface components {
              *     the parent event series asatidz_id (effective ID).
              */
             asatidz?: components["schemas"]["AsatidzResponse"] | null;
+        };
+        PaginatedEventSeriesResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["EventSeriesResponse"][];
+            pagination: components["schemas"]["PaginationMeta"];
         };
         PaginatedEventRecurringResponse: {
             /** @example true */
@@ -1616,6 +1645,45 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listSeries: {
+        parameters: {
+            query?: {
+                /** @description Opaque base64-encoded cursor for pagination (obtained from a previous response's `pagination.next_cursor` or `pagination.prev_cursor`) */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Number of items per page (default: 20, max: 100) */
+                limit?: components["parameters"]["Limit"];
+                /**
+                 * @description Comma-separated list of related objects to embed inline.
+                 *     Supported values: `place`, `asatidz`. Unknown tokens are ignored.
+                 *     When omitted, only bare IDs are returned (backward-compatible default).
+                 */
+                expand?: components["parameters"]["ExpandPlaceAsatidz"];
+                /** @description Filter by place UUID */
+                place_id?: string;
+                /** @description Filter by asatidz UUID */
+                asatidz_id?: string;
+                /** @description Filter by subject UUID */
+                subject_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of event series */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedEventSeriesResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -64,5 +64,5 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 		// Non-fatal — schedule strip renders empty; client re-fetches.
 	}
 
-	return { seriesInitialData, occurrencesInitialData };
+	return { seriesInitialData, occurrencesInitialData, meta: { title: 'Daftar Kajian' } };
 };

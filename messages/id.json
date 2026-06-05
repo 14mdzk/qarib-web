@@ -73,6 +73,7 @@
 	"event_status_completed": "Selesai",
 	"event_card_aria_label": "Kajian",
 	"event_card_untitled": "(Tanpa judul)",
+	"event_card_view_subject": "Lihat tema",
 	"peta_date_today": "Hari ini",
 	"peta_map_loading_toast": "Memuat kajian di sekitarmu…",
 	"peta_map_empty_title": "Belum ada di area ini",

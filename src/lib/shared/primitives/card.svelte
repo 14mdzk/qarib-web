@@ -11,6 +11,6 @@
 	let { class: klass = '', children, ...rest }: Props = $props();
 </script>
 
-<div class={cn('bg-surface-2 border-border rounded-lg border p-4 shadow', klass)} {...rest}>
+<div class={cn('bg-surface-2 border-border rounded border p-4 shadow', klass)} {...rest}>
 	{@render children?.()}
 </div>
