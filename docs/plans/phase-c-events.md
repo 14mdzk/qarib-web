@@ -35,12 +35,12 @@
 - `events.series` — GET `/events/series/{slug}` — args `{ slug }`.
 - `events.seriesUpcoming` / `events.seriesRecurrings` — GET those paths — args `{ slug, limit?, cursor? }`.
 
-- [ ] Step 1 — TDD `formatTime` → colon: update `date.test.ts` to assert a colon, run (fail), change `formatTime`, run (pass).
-- [ ] Step 2 — Add the registry entries; `bun run check` confirms the path keys resolve against `paths`.
-- [ ] Step 3 — `schema.ts`: re-export the generated occurrence/series types; add a Zod parser for the nearby item **including the expanded `place` shape** (`{ lat:number, lng:number, name, address? }`) used for pins; a small `eventStatus` enum map + a `statusLabel`/`isUpcoming` helper.
-- [ ] Step 4 — `service.ts`: the only `api()` caller for events (nearby/list/get/series…). TDD with MSW: nearby returns parsed occurrences; a `success:false` envelope throws `ApiError`.
-- [ ] Step 5 — `queries.ts`: svelte-query keys + `defineQuery`/`defineMutation`; a cursor-paginated nearby query (infinite-style using `pagination.next_cursor` / `has_more`). Test the key shape + the cursor accumulation logic (pure).
-- [ ] Step 6 — `index.ts` barrel. Gates green. Commit `feat(events): events domain data layer (registry, schema, service, cursor queries)`.
+- [x] Step 1 — TDD `formatTime` → colon: update `date.test.ts` to assert a colon, run (fail), change `formatTime`, run (pass).
+- [x] Step 2 — Add the registry entries; `bun run check` confirms the path keys resolve against `paths`.
+- [x] Step 3 — `schema.ts`: re-export the generated occurrence/series types; add a Zod parser for the nearby item **including the expanded `place` shape** (`{ lat:number, lng:number, name, address? }`) used for pins; a small `eventStatus` enum map + a `statusLabel`/`isUpcoming` helper.
+- [x] Step 4 — `service.ts`: the only `api()` caller for events (nearby/list/get/series…). TDD with MSW: nearby returns parsed occurrences; a `success:false` envelope throws `ApiError`.
+- [x] Step 5 — `queries.ts`: svelte-query keys + `defineQuery`/`defineMutation`; a cursor-paginated nearby query (infinite-style using `pagination.next_cursor` / `has_more`). Test the key shape + the cursor accumulation logic (pure).
+- [x] Step 6 — `index.ts` barrel. Gates green. Commit `feat(events): events domain data layer (registry, schema, service, cursor queries)`.
 
 **Exit:** a (headless) caller can fetch + type nearby occurrences and paginate by cursor; times format as `HH:mm`. No map, no route.
 
@@ -55,11 +55,11 @@
 - Modify: `package.json` — add `leaflet` + `@types/leaflet` (record rationale in `docs/decisions/dependencies.md`).
 - Create: `src/lib/shared/composites/map-view.svelte` (Leaflet **client-only island**) + `src/lib/domains/events/pin-tier.ts` (port `pinTierService` from cms) + `pin-tier.test.ts`.
 
-- [ ] Step 1 — `STADIA_API_KEY` into the config schema (server-only) + `index.server.ts` import.
-- [ ] Step 2 — TDD the tile proxy (`src/lib/server/tile-proxy.ts` helper, unit-tested like `bff-proxy`): builds the Stadia URL with the key from `serverConfig`, strips client headers, returns a `Cache-Control: public, max-age=...` response. Then the `+server.ts` GET handler uses it. Stadia URL form: `https://tiles.stadiamaps.com/tiles/<style>/{z}/{x}/{y}{r}.png?api_key=<KEY>` — pick a **warm** style (e.g. `alidade_smooth` or `stamen_toner_lite`); the route maps `/api/tiles/{z}/{x}/{y}{@2x}.png` → upstream. **Key never reaches the client.**
-- [ ] Step 3 — Port `pin-tier.ts` (urgency/distance → tier; map tier → a token color) from `qarib-cms/resources/js/lib/services/pinTierService.ts`; unit-test the tiering.
-- [ ] Step 4 — `map-view.svelte`: import Leaflet in `onMount` only (client-only; never SSR). Props `{ center, zoom, pins: {id,lat,lng,tier}[], userLocation? }`; tile layer → `/api/tiles/...`; pins as `divIcon` styled with tier token colors + a 🕌 hero/cluster style; user-location dot; dispatch a `pinclick` event with the id. Honor `prefers-reduced-motion`. Guard against double-init.
-- [ ] Step 5 — Gates green. Commit `feat(map): BFF Stadia tile proxy + Leaflet MapView composite`.
+- [x] Step 1 — `STADIA_API_KEY` into the config schema (server-only) + `index.server.ts` import.
+- [x] Step 2 — TDD the tile proxy (`src/lib/server/tile-proxy.ts` helper, unit-tested like `bff-proxy`): builds the Stadia URL with the key from `serverConfig`, strips client headers, returns a `Cache-Control: public, max-age=...` response. Then the `+server.ts` GET handler uses it. Stadia URL form: `https://tiles.stadiamaps.com/tiles/<style>/{z}/{x}/{y}{r}.png?api_key=<KEY>` — pick a **warm** style (e.g. `alidade_smooth` or `stamen_toner_lite`); the route maps `/api/tiles/{z}/{x}/{y}{@2x}.png` → upstream. **Key never reaches the client.**
+- [x] Step 3 — Port `pin-tier.ts` (urgency/distance → tier; map tier → a token color) from `qarib-cms/resources/js/lib/services/pinTierService.ts`; unit-test the tiering.
+- [x] Step 4 — `map-view.svelte`: import Leaflet in `onMount` only (client-only; never SSR). Props `{ center, zoom, pins: {id,lat,lng,tier}[], userLocation? }`; tile layer → `/api/tiles/...`; pins as `divIcon` styled with tier token colors + a 🕌 hero/cluster style; user-location dot; dispatch a `pinclick` event with the id. Honor `prefers-reduced-motion`. Guard against double-init.
+- [x] Step 5 — Gates green. Commit `feat(map): BFF Stadia tile proxy + Leaflet MapView composite`.
 
 **Exit:** `MapView` renders warm Stadia tiles with tier-styled pins; `STADIA_API_KEY` is absent from the client bundle (verify `bun run build` output / grep `.svelte-kit/output/client` for the key → none).
 
@@ -72,11 +72,12 @@
 - Create: `src/lib/domains/events/components/event-card.svelte` (+ test), and the UI stores ported as **context-DI** (`state-management.md`): `domains/events/store.svelte.ts` (map filters + selected pin) and a `core` location service (geolocation) — port/adapt `qarib-cms` `location.svelte.ts`/`mapFilters.svelte.ts`/`nearby.svelte.ts` (NO module singletons — factory + `setContext`).
 - Modify: `messages/id.json` (+ peta UI strings; replace the `peta_soon_*` placeholder copy).
 
-- [ ] Step 1 — Geolocation: a `createLocation()` context service — request permission; expose `coords | null` + `status`; on deny/unavailable → caller uses `region_id` fallback (a sensible default region or a region picker stub).
-- [ ] Step 2 — `event-card.svelte`: time (`HH:mm`) + prayer anchor (`getPrayerLabel`) + title (occurrence name → series fallback) + masjid + `distance_km` (`formatDistance`) + a status `Badge`. TDD any pure formatting.
-- [ ] Step 3 — `/peta/+page.svelte`: the map (MapView) ↔ list toggle, a date strip, subject chips; bind the nearby query (lat/lng from location, else region); pin-click → bottom-sheet/callout with the occurrence + a "Buka kajian" link to `/kajian/[id]`. Map-home header (A4 home mode).
-- [ ] Step 4 — e2e: with MSW stubbing `/api/upstream/events/nearby`, `/peta` renders pins + list; clicking an event navigates to `/kajian/[id]`.
-- [ ] Step 5 — Gates green. Commit `feat(peta): nearby-kajian map home (map+list, filters, geolocation)`.
+- [x] Step 1 — Geolocation: a `createLocation()` context service — request permission; expose `coords | null` + `status`; on deny/unavailable → caller uses `region_id` fallback (a sensible default region or a region picker stub).
+- [x] Step 2 — `event-card.svelte`: time (`HH:mm`) + prayer anchor (`getPrayerLabel`) + title (occurrence name → series fallback) + masjid + `distance_km` (`formatDistance`) + a status `Badge`. TDD any pure formatting.
+- [x] Step 3 — `/peta/+page.svelte`: the map (MapView) ↔ list toggle, a date strip, subject chips; bind the nearby query (lat/lng from location, else region); pin-click → bottom-sheet/callout with the occurrence + a "Buka kajian" link to `/kajian/[id]`. Map-home header (A4 home mode).
+- [x] Step 4 — e2e: with MSW stubbing `/api/upstream/events/nearby`, `/peta` renders pins + list; clicking an event navigates to `/kajian/[id]`.
+- [x] Step 5 — Gates green. Commit `feat(peta): nearby-kajian map home (map+list, filters, geolocation)`.
+- [x] Step 6 — **Post-implementation: Component z-index adjustments** — Fixed z-index layers on the Map page and its composite overlays. Updated `PinSheet`, `MapFab`, and `MapFilterChips` styling from lower values (`15` / `20`) to `999` to display them on top of Leaflet map tiles (which default to layer index of 400). Updated related overlays/loading states/empty/error templates and the scrim button to `999`/`998` values accordingly.
 
 **Exit:** a visitor opens `/peta`, sees nearby kajian as pins + a list, filters by date/tema, and opens a kajian — public, SSR shell + client map island.
 
@@ -86,10 +87,10 @@
 
 **Files:** Create `src/routes/(app)/kajian/[id]/+page.svelte` + `+page.ts` (load `events.get` with `expand=place,asatidz`). Modify `messages/id.json` (+detail strings).
 
-- [ ] Step 1 — `+page.ts` load: `events.get({ id, expand: 'place,asatidz' })`; 404 → SvelteKit `error(404)`.
-- [ ] Step 2 — `+page.svelte` (back-mode header, title = kajian name): hero (name + subject badge + status), date/time (`HH:mm`) + prayer anchor, masjid card (name, address, link to `/masjid/[id]` — placeholder until D), ustadz card (name, link to `/ustadz/[id]` — placeholder until E). Reuse `event-card` pieces where sensible.
-- [ ] Step 3 — e2e: open a stubbed kajian → detail renders; back nav returns.
-- [ ] Step 4 — Gates green. Commit `feat(kajian): event detail page`.
+- [x] Step 1 — `+page.ts` load: `events.get({ id, expand: 'place,asatidz' })`; 404 → SvelteKit `error(404)`.
+- [x] Step 2 — `+page.svelte` (back-mode header, title = kajian name): hero (name + subject badge + status), date/time (`HH:mm`) + prayer anchor, masjid card (name, address, link to `/masjid/[id]` — placeholder until D), ustadz card (name, link to `/ustadz/[id]` — placeholder until E). Reuse `event-card` pieces where sensible.
+- [x] Step 3 — e2e: open a stubbed kajian → detail renders; back nav returns.
+- [x] Step 4 — Gates green. Commit `feat(kajian): event detail page`.
 
 **Exit:** opening a kajian (from `/peta` or a link) shows full detail with working back nav.
 

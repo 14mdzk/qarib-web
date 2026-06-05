@@ -268,7 +268,7 @@
 
 	<!-- ProgressStrip: background revalidation (data already loaded, now refreshing) -->
 	{#if query.isFetching && !query.isPending}
-		<div class="absolute top-0 right-0 left-0 z-30">
+		<div class="absolute top-0 right-0 left-0 z-[999]">
 			<ProgressStrip class="h-1 w-full" />
 		</div>
 	{/if}
@@ -276,7 +276,7 @@
 	<!-- Cold-load ghost pins + toast -->
 	{#if query.isPending}
 		<!-- Decorative ghost pins scattered over the map -->
-		<div class="pointer-events-none absolute inset-0 z-10" aria-hidden="true">
+		<div class="pointer-events-none absolute inset-0 z-[998]" aria-hidden="true">
 			{#each GHOST_PIN_DELAYS as delay, i (i)}
 				<div class="absolute" style="left: {20 + i * 15}%; top: {25 + (i % 3) * 20}%;">
 					<GhostPin animationDelay={delay} />
@@ -284,7 +284,7 @@
 			{/each}
 		</div>
 		<!-- Toast: non-intrusive notification while loading -->
-		<div class="absolute top-14 right-4 left-4 z-30 flex justify-center">
+		<div class="absolute top-14 right-4 left-4 z-[999] flex justify-center">
 			<MapToast message={m.peta_map_loading_toast()} loading={true} />
 		</div>
 	{/if}
@@ -292,7 +292,7 @@
 	<!-- Error state: in-map error card -->
 	{#if query.isError}
 		<div
-			class="absolute inset-x-4 top-1/2 z-30 -translate-y-1/2 rounded-[14px] bg-white p-6 text-center shadow-xl"
+			class="absolute inset-x-4 top-1/2 z-[999] -translate-y-1/2 rounded-[14px] bg-white p-6 text-center shadow-xl"
 		>
 			<div
 				class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full"
@@ -328,7 +328,7 @@
 
 	<!-- Empty state: in-map empty card (resolved, 0 events) -->
 	{#if !query.isPending && !query.isError && events.length === 0}
-		<div class="absolute top-1/2 right-0 left-0 z-30 -translate-y-1/2 px-9 text-center">
+		<div class="absolute top-1/2 right-0 left-0 z-[999] -translate-y-1/2 px-9 text-center">
 			<div
 				class="mx-auto mb-3 grid h-[52px] w-[52px] place-items-center rounded-full border shadow-md"
 				style="background: white; border-color: var(--color-line); color: var(--color-ink-3);"
@@ -396,7 +396,7 @@
 		/>
 		<!-- Scrim: tap outside sheet to close -->
 		<button
-			class="absolute inset-0 z-10 cursor-default bg-transparent"
+			class="absolute inset-0 z-[998] cursor-default bg-transparent"
 			style="bottom: {eventsView.sheetMode === 'full' ? '72%' : '40%'};"
 			aria-label={m.pin_sheet_collapse()}
 			onclick={() => eventsView.closeSheet()}

@@ -52,7 +52,7 @@
 		top: 8px;
 		left: 10px;
 		right: 10px;
-		z-index: 20;
+		z-index: 999;
 		display: flex;
 		gap: 6px;
 		overflow-x: auto;

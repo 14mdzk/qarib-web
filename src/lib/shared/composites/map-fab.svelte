@@ -63,7 +63,7 @@
 		place-items: center;
 		color: var(--color-ink);
 		cursor: pointer;
-		z-index: 20;
+		z-index: 999;
 	}
 
 	.map-fab:hover:not(:disabled) {
