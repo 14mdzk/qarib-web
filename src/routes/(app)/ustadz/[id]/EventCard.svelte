@@ -2,6 +2,7 @@
 	import { defineSubjectByIdQuery } from '$domains/subject/queries.js';
 	import BaseEventCard from '$domains/events/components/event-card.svelte';
 	import type { EventSeriesResponse } from '$domains/events';
+	import { l10n } from '$shared/utils/l10n';
 
 	let { series }: { series: EventSeriesResponse } = $props();
 
@@ -20,11 +21,7 @@
 		}
 	);
 
-	const subjectName = $derived(
-		subjectQuery.data?.name
-			? (subjectQuery.data.name['id'] ?? Object.values(subjectQuery.data.name)[0] ?? '')
-			: ''
-	);
+	const subjectName = $derived(l10n(subjectQuery.data?.name ?? {}) ?? '');
 </script>
 
 <BaseEventCard {series} {subjectName} hideScholarLink={true} />
