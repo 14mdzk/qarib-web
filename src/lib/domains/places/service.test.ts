@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { ApiError } from '$core/api';
-import { fetchPlaceById } from './service.js';
+import { fetchPlaceById, fetchPlaceList } from './service.js';
 
 function baseOpts() {
 	return { fetch: globalThis.fetch, baseUrl: 'http://localhost' } as const;
@@ -37,6 +37,37 @@ function makePlace(overrides: Record<string, unknown> = {}) {
 		...overrides
 	};
 }
+
+// ---------------------------------------------------------------------------
+// fetchPlaceList
+// ---------------------------------------------------------------------------
+
+describe('fetchPlaceList', () => {
+	it('returns paginated places and forwards nearby radius filters', async () => {
+		server.use(
+			http.get('http://localhost/api/upstream/places', ({ request }) => {
+				const params = new URL(request.url).searchParams;
+				expect(params.get('near_lat')).toBe('-6.732');
+				expect(params.get('near_lng')).toBe('108.5523');
+				expect(params.get('radius_km')).toBe('50');
+				return HttpResponse.json({
+					success: true,
+					data: [makePlace({ id: 'place-cirebon-001' })],
+					pagination: { has_more: false, has_prev: false, total: 1 }
+				});
+			})
+		);
+
+		const result = await fetchPlaceList(
+			{ near_lat: -6.732, near_lng: 108.5523, radius_km: 50 },
+			baseOpts()
+		);
+
+		expect(result.data).toHaveLength(1);
+		expect(result.data[0]?.id).toBe('place-cirebon-001');
+		expect(result.pagination.total).toBe(1);
+	});
+});
 
 // ---------------------------------------------------------------------------
 // fetchPlaceById

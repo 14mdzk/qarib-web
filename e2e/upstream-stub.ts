@@ -42,6 +42,122 @@ function failure(res: http.ServerResponse, status: number, code: string, message
 	json(res, status, { success: false, error: { code, message } });
 }
 
+function pagination(total: number) {
+	return {
+		next_cursor: null,
+		prev_cursor: null,
+		has_more: false,
+		has_prev: false,
+		total
+	};
+}
+
+function paginated(data: unknown[]) {
+	return {
+		success: true,
+		data,
+		pagination: pagination(data.length)
+	};
+}
+
+function occurrence(overrides: Record<string, unknown> = {}) {
+	return {
+		id: 1001,
+		event_id: 'uuid-series-a',
+		name: { id: 'Kajian Tafsir Al-Quran', en: 'Tafsir Al-Quran Study' },
+		date_start: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+		date_end: null,
+		date_prayer: 4,
+		status: 0,
+		going_count: 12,
+		distance_km: 0.8,
+		place: {
+			id: 'place-uuid-1',
+			slug: 'masjid-al-falah',
+			name: { id: 'Masjid Al-Falah', en: 'Masjid Al-Falah' },
+			address: 'Jl. Contoh No. 1, Cirebon',
+			lat: -6.732,
+			lng: 108.5523
+		},
+		...overrides
+	};
+}
+
+function defaultOccurrences() {
+	return [
+		occurrence(),
+		occurrence({
+			id: 1002,
+			event_id: 'uuid-series-b',
+			name: { id: "Pengajian Ibu-Ibu Ba'da Isya", en: 'Post-Isha Study Circle' },
+			date_start: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+			date_prayer: 2,
+			going_count: 7,
+			distance_km: 1.4,
+			place: {
+				id: 'place-uuid-2',
+				slug: 'masjid-jami-cirebon',
+				name: { id: "Masjid Jami' Cirebon", en: "Masjid Jami' Cirebon" },
+				address: "Jl. Jami' No. 5, Cirebon",
+				lat: -6.74,
+				lng: 108.561
+			}
+		})
+	];
+}
+
+function futureFallbackOccurrences() {
+	const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+	const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+	return [
+		occurrence({
+			id: 2001,
+			event_id: 'uuid-future-a',
+			name: { id: 'Kajian Fiqih Mendatang' },
+			date_start: tomorrow,
+			distance_km: 18,
+			place: {
+				id: 'place-future-1',
+				slug: 'masjid-future-one',
+				name: { id: 'Masjid Masa Depan' },
+				address: 'Jl. Besok No. 1, Cirebon',
+				lat: -6.71,
+				lng: 108.58
+			}
+		}),
+		occurrence({
+			id: 2002,
+			event_id: 'uuid-future-b',
+			name: { id: 'Kajian Fiqih Pekanan' },
+			date_start: nextWeek,
+			distance_km: 18,
+			place: {
+				id: 'place-future-1',
+				slug: 'masjid-future-one',
+				name: { id: 'Masjid Masa Depan' },
+				address: 'Jl. Besok No. 1, Cirebon',
+				lat: -6.71,
+				lng: 108.58
+			}
+		}),
+		occurrence({
+			id: 2003,
+			event_id: 'uuid-future-c',
+			name: { id: 'Kajian Sirah Mendatang' },
+			date_start: nextWeek,
+			distance_km: 42,
+			place: {
+				id: 'place-future-2',
+				slug: 'masjid-future-two',
+				name: { id: 'Masjid Radius Luas' },
+				address: 'Jl. Luas No. 2, Cirebon',
+				lat: -6.69,
+				lng: 108.6
+			}
+		})
+	];
+}
+
 // ---------------------------------------------------------------------------
 // Route definitions
 // ---------------------------------------------------------------------------
@@ -103,60 +219,72 @@ routes.set('GET:/auth/session', (_req, res) => {
 	});
 });
 
+// GET /subjects?… (prefix match — peta subject filter)
+prefixRoutes.push({
+	method: 'GET',
+	prefix: '/subjects',
+	handler: (_req, res) => {
+		json(
+			res,
+			200,
+			paginated([
+				{
+					id: 'subject-tafsir',
+					slug: 'tafsir',
+					name: { id: 'Tafsir' },
+					description: { id: 'Kajian tafsir.' },
+					is_active: true
+				},
+				{
+					id: 'subject-empty',
+					slug: 'fiqih',
+					name: { id: 'Fiqih' },
+					description: { id: 'Kajian fiqih.' },
+					is_active: true
+				}
+			])
+		);
+	}
+});
+
 // GET /events/nearby?… (prefix match — handles any query string combination)
 prefixRoutes.push({
 	method: 'GET',
 	prefix: '/events/nearby',
-	handler: (_req, res) => {
+	handler: (req, res) => {
+		const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+		const subjectId = params.get('subject_id');
+		const radiusKm = Number(params.get('radius_km') ?? '10');
+		const limit = Number(params.get('limit') ?? '10');
+
+		if (subjectId === 'subject-empty' && limit < 30) {
+			return json(res, 200, {
+				success: true,
+				data: [],
+				pagination: pagination(0)
+			});
+		}
+
+		if (subjectId === 'subject-empty' && radiusKm >= 100 && limit >= 30) {
+			return json(res, 200, {
+				success: true,
+				data: futureFallbackOccurrences(),
+				pagination: pagination(3)
+			});
+		}
+
+		if (subjectId === 'subject-tafsir') {
+			return json(res, 200, {
+				success: true,
+				data: [occurrence({ id: 3001, event_id: 'uuid-tafsir-a' })],
+				pagination: pagination(1)
+			});
+		}
+
 		json(res, 200, {
 			success: true,
-			data: [
-				{
-					id: 1001,
-					event_id: 'uuid-series-a',
-					name: { id: 'Kajian Tafsir Al-Quran', en: 'Tafsir Al-Quran Study' },
-					date_start: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-					date_end: null,
-					date_prayer: 4,
-					status: 0,
-					going_count: 12,
-					distance_km: 0.8,
-					place: {
-						id: 'place-uuid-1',
-						slug: 'masjid-al-falah',
-						name: { id: 'Masjid Al-Falah', en: 'Masjid Al-Falah' },
-						address: 'Jl. Contoh No. 1, Cirebon',
-						lat: -6.732,
-						lng: 108.5523
-					}
-				},
-				{
-					id: 1002,
-					event_id: 'uuid-series-b',
-					name: { id: "Pengajian Ibu-Ibu Ba'da Isya", en: 'Post-Isha Study Circle' },
-					date_start: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
-					date_end: null,
-					date_prayer: 2,
-					status: 0,
-					going_count: 7,
-					distance_km: 1.4,
-					place: {
-						id: 'place-uuid-2',
-						slug: 'masjid-jami-cirebon',
-						name: { id: "Masjid Jami' Cirebon", en: "Masjid Jami' Cirebon" },
-						address: "Jl. Jami' No. 5, Cirebon",
-						lat: -6.74,
-						lng: 108.561
-					}
-				}
-			],
-			pagination: {
-				next_cursor: null,
-				prev_cursor: null,
-				has_more: false,
-				has_prev: false,
-				total: 2
-			}
+			data: defaultOccurrences(),
+			pagination: pagination(2)
 		});
 	}
 });

@@ -16,8 +16,9 @@
 import { createQuery } from '@tanstack/svelte-query';
 import { api } from '$core/api';
 import type { QueryClient } from '@tanstack/svelte-query';
+import type { Paginated } from '$core/api';
 import type { SubjectResponse } from './schema.js';
-import type { GetByIdArgs } from './service.js';
+import type { GetByIdArgs, ListSubjectsArgs } from './service.js';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -25,8 +26,44 @@ import type { GetByIdArgs } from './service.js';
 
 export const subjectKeys = {
 	all: ['subject'] as const,
+	list: (args: ListSubjectsArgs) => ['subject', 'list', args] as const,
 	get: (id: string, expand?: string) => ['subject', 'get', id, expand] as const
 } as const;
+
+// ---------------------------------------------------------------------------
+// Subject list query
+// ---------------------------------------------------------------------------
+
+/**
+ * Reactive subject-list query.
+ */
+export function defineSubjectListQuery(
+	args: ListSubjectsArgs,
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: Paginated<SubjectResponse[]>;
+	},
+	queryClient?: QueryClient
+) {
+	return createQuery<Paginated<SubjectResponse[]>>(
+		() => ({
+			queryKey: subjectKeys.list(args),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('subject.list', args, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<SubjectResponse[]>>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+		}),
+		queryClient ? () => queryClient : undefined
+	);
+}
 
 // ---------------------------------------------------------------------------
 // Single-subject query

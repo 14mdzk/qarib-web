@@ -8,12 +8,33 @@
  *   - rule .claude/rules/api-contract.md   (no hand-rolled fetch; all via api())
  *   - rule .claude/rules/architecture.md   (service.ts in domains/places/)
  */
-import { api, type ApiCallOptions } from '$core/api';
+import { api, type ApiCallOptions, type Paginated } from '$core/api';
 import type { PlaceResponse } from './schema.js';
+
+export interface ListPlacesArgs {
+	cursor?: string;
+	limit?: number;
+	search?: string;
+	region_id?: string;
+	is_active?: boolean;
+	near_lat?: number;
+	near_lng?: number;
+	radius_km?: number;
+}
 
 export interface GetByIdArgs {
 	id: string;
 	expand?: string;
+}
+
+/**
+ * List places (masjid), optionally near a lat/lng.
+ */
+export async function fetchPlaceList(
+	args: ListPlacesArgs,
+	opts?: ApiCallOptions
+): Promise<Paginated<PlaceResponse[]>> {
+	return api('places.list', args, undefined, opts);
 }
 
 /**

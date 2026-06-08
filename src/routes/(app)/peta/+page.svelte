@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { m } from '$core/i18n';
 	import { GhostPin, MapToast, ProgressStrip, ContentDim } from '$lib/shared/primitives';
@@ -11,9 +11,15 @@
 	import type { FilterChip } from '$lib/shared/composites/map-filter-chips.svelte';
 	import MapFab from '$lib/shared/composites/map-fab.svelte';
 	import { toDateRange, formatTime, formatDistance } from '$lib/shared/utils/date.js';
-	import { createLocation } from '$core/location/index.svelte.js';
-	import { createEventsView } from '$domains/events/store.svelte.js';
+	import { createLocation, DEFAULT_CENTER } from '$core/location/index.svelte.js';
+	import {
+		createEventsView,
+		DEFAULT_RADIUS_KM,
+		MAX_RADIUS_KM,
+		RADIUS_STEPS_KM
+	} from '$domains/events/store.svelte.js';
 	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
+	import { defineSubjectListQuery } from '$domains/subject/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
 	import { groupOccurrencesToPlacePins } from '$domains/events/place-pins.js';
 	import type { Paginated } from '$core/api';
@@ -21,9 +27,10 @@
 		EventRecurringResponse,
 		EventRecurringResponseWithPlace
 	} from '$domains/events/schema.js';
+	import type { SubjectResponse } from '$domains/subject/schema.js';
 	import type { InfiniteData } from '@tanstack/svelte-query';
 	import type { PageData } from './$types';
-	import { GlobeOff, Map } from '@lucide/svelte';
+	import { CalendarDays, GlobeOff, ListFilter, Map as MapIcon, MapPin } from '@lucide/svelte';
 	import { l10n } from '$shared/utils/l10n';
 
 	let { data }: { data: PageData } = $props();
@@ -34,6 +41,8 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
+	let activeFilterSheet = $state<'date' | 'subject' | null>(null);
+	let locationNoticeDismissed = $state(false);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
@@ -58,6 +67,42 @@
 
 	const dateStrip = buildDateStrip();
 
+	function addDaysIso(days: number): string {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- pure date arithmetic helper, not component state.
+		const d = new Date();
+		d.setDate(d.getDate() + days);
+		return d.toISOString().slice(0, 10);
+	}
+
+	const tomorrowIso = $derived(dateStrip[1]?.iso ?? addDaysIso(1));
+
+	function formatDateChip(iso: string): string {
+		if (iso === dateStrip[0].iso) return m.peta_filter_date_today();
+		if (iso === tomorrowIso) return m.peta_filter_date_tomorrow();
+		return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(
+			new Date(`${iso}T00:00:00`)
+		);
+	}
+
+	function futureRange(): { date_from: string; date_to: string } {
+		const start = toDateRange(tomorrowIso);
+		const end = toDateRange(addDaysIso(14));
+		return { date_from: start.date_from, date_to: end.date_to };
+	}
+
+	function nextRadiusKm(current: number): number {
+		return RADIUS_STEPS_KM.find((step) => step > current) ?? MAX_RADIUS_KM;
+	}
+
+	const DEFAULT_CENTER_TOLERANCE = 0.0001;
+
+	function isDefaultCenter(center: { lat: number; lng: number }): boolean {
+		return (
+			Math.abs(center.lat - DEFAULT_CENTER.lat) <= DEFAULT_CENTER_TOLERANCE &&
+			Math.abs(center.lng - DEFAULT_CENTER.lng) <= DEFAULT_CENTER_TOLERANCE
+		);
+	}
+
 	// ---------------------------------------------------------------------------
 	// Svelte-query: cursor-paginated nearby feed (state-management.md rule)
 	// ---------------------------------------------------------------------------
@@ -68,27 +113,72 @@
 	const queryArgs = $derived({
 		lat: location.center.lat,
 		lng: location.center.lng,
+		radius_km: eventsView.selectedRadiusKm,
+		subject_id: eventsView.selectedSubjectId ?? undefined,
 		date_from: dateRange.date_from,
 		date_to: dateRange.date_to,
 		expand: 'place',
 		limit: 10
 	});
 
+	const initialDataStillMatches = $derived(
+		location.mode === 'default' &&
+			isDefaultCenter(location.center) &&
+			activeDay === dateStrip[0].iso &&
+			eventsView.selectedRadiusKm === DEFAULT_RADIUS_KM &&
+			eventsView.selectedSubjectId == null
+	);
+
 	// SSR seed
 	const _initData = $derived(data.initialData as Paginated<EventRecurringResponse[]> | null);
 
 	const query = defineNearbyInfiniteQuery(() => ({
 		args: queryArgs,
-		initialData: _initData
-			? ({
-					pages: [_initData],
-					pageParams: [null]
-				} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
-			: undefined
+		initialData:
+			_initData && initialDataStillMatches
+				? ({
+						pages: [_initData],
+						pageParams: [null]
+					} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
+				: undefined
 	}));
 
 	// Derived flat list from all pages.
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
+
+	const subjectQuery = defineSubjectListQuery(
+		{ limit: 100, is_active: true },
+		{ staleTime: 5 * 60_000 }
+	);
+	const subjects = $derived((subjectQuery.data?.data ?? []) as SubjectResponse[]);
+	const selectedSubject = $derived(
+		subjects.find((subject) => subject.id === eventsView.selectedSubjectId) ?? null
+	);
+
+	const showLocationNotice = $derived(
+		!locationNoticeDismissed &&
+			(location.permission === 'denied' || location.permission === 'unavailable')
+	);
+
+	const fallbackDateRange = $derived(futureRange());
+	const fallbackArgs = $derived({
+		lat: location.center.lat,
+		lng: location.center.lng,
+		radius_km: MAX_RADIUS_KM,
+		subject_id: eventsView.selectedSubjectId ?? undefined,
+		date_from: fallbackDateRange.date_from,
+		date_to: fallbackDateRange.date_to,
+		expand: 'place',
+		limit: 30
+	});
+	const fallbackEnabled = $derived(query.isSuccess && events.length === 0 && !showLocationNotice);
+	const fallbackQuery = defineNearbyInfiniteQuery(() => ({
+		args: fallbackArgs,
+		enabled: fallbackEnabled
+	}));
+	const fallbackEvents = $derived(
+		(fallbackQuery.data?.pages ?? []).flatMap((p) => p.data) as EventRecurringResponseWithPlace[]
+	);
 
 	// ---------------------------------------------------------------------------
 	// Place pins — grouped by mosque (v2: one pin per place, not per occurrence)
@@ -111,16 +201,23 @@
 	);
 
 	// ---------------------------------------------------------------------------
-	// Filter chips — date strip as chips
+	// Filter chips — date + subject selectors
 	// ---------------------------------------------------------------------------
 
-	const filterChips = $derived<FilterChip[]>(
-		dateStrip.map((day) => ({
-			key: day.iso,
-			label: day.label,
-			active: activeDay === day.iso
-		}))
-	);
+	const filterChips = $derived<FilterChip[]>([
+		{
+			key: 'date',
+			label: m.peta_filter_date_label({ value: formatDateChip(activeDay) }),
+			active: activeFilterSheet === 'date'
+		},
+		{
+			key: 'subject',
+			label: m.peta_filter_subject_label({
+				value: selectedSubject ? l10n(selectedSubject.name) : m.peta_filter_subject_all()
+			}),
+			active: activeFilterSheet === 'subject'
+		}
+	]);
 
 	// ---------------------------------------------------------------------------
 	// FAB bottom offset — clears pin sheet when open
@@ -182,6 +279,26 @@
 	// ---------------------------------------------------------------------------
 
 	let activePinDay = $state<'today' | 'tomorrow' | 'week'>('today');
+	let lastQueryContextKey = $state<string | null>(null);
+
+	const queryContextKey = $derived(
+		[
+			activeDay,
+			eventsView.selectedRadiusKm,
+			eventsView.selectedSubjectId ?? '',
+			location.center.lat.toFixed(5),
+			location.center.lng.toFixed(5)
+		].join('|')
+	);
+
+	$effect(() => {
+		const key = queryContextKey;
+		if (lastQueryContextKey !== null && lastQueryContextKey !== key) {
+			eventsView.closeSheet();
+			activePinDay = 'today';
+		}
+		lastQueryContextKey = key;
+	});
 
 	// ---------------------------------------------------------------------------
 	// Navigation helpers
@@ -196,15 +313,75 @@
 			// No valid series event_id — row should have been non-actionable; bail out.
 			return;
 		}
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- /kajian/[event_id] lands in phase D; resolve() added once the route file exists.
-		goto(`${base}/kajian/${eventId}`);
+		goto(resolve('/(app)/kajian/[id]', { id: eventId }));
 	}
 
 	function navigateToPlace(placeId: string): void {
-		// TODO(phase-D): place detail route
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- /masjid/[id] lands in phase D; resolve() added once the route file exists.
-		goto(`${base}/masjid/${placeId}`);
+		goto(resolve('/(app)/tempat/[id]', { id: placeId }));
 	}
+
+	function chooseDate(iso: string | null): void {
+		eventsView.selectDate(iso);
+		activeFilterSheet = null;
+	}
+
+	function chooseSubject(id: string | null): void {
+		eventsView.selectSubject(id);
+		activeFilterSheet = null;
+	}
+
+	function expandRadius(): void {
+		eventsView.expandRadius();
+	}
+
+	function groupFallbackPlaces(items: EventRecurringResponseWithPlace[]): Array<{
+		id: string;
+		name: string;
+		address: string;
+		count: number;
+		nextLabel: string;
+	}> {
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local grouping accumulator, not reactive state.
+		const byPlace = new Map<
+			string,
+			{
+				name: string;
+				address: string;
+				dates: string[];
+			}
+		>();
+
+		for (const event of items) {
+			if (!event.place?.id || !event.date_start) continue;
+			const existing = byPlace.get(event.place.id);
+			if (existing) {
+				existing.dates.push(event.date_start);
+				continue;
+			}
+			byPlace.set(event.place.id, {
+				name: l10n(event.place.name),
+				address: event.place.address ?? '',
+				dates: [event.date_start]
+			});
+		}
+
+		return [...byPlace.entries()]
+			.map(([id, place]) => {
+				const sortedDates = place.dates.toSorted(
+					(a, b) => new Date(a).getTime() - new Date(b).getTime()
+				);
+				return {
+					id,
+					name: place.name,
+					address: place.address,
+					count: place.dates.length,
+					nextLabel: sortedDates[0] ? formatDateChip(sortedDates[0].slice(0, 10)) : ''
+				};
+			})
+			.slice(0, 4);
+	}
+
+	const fallbackPlaces = $derived(groupFallbackPlaces(fallbackEvents));
 
 	// ---------------------------------------------------------------------------
 	// Ghost pins for cold-load state (scattered static positions, decorative)
@@ -242,7 +419,7 @@
 				}}
 			/>
 		</ContentDim>
-	{:else if !query.isError}
+	{:else}
 		<MapView
 			center={mapCenter}
 			zoom={13}
@@ -277,63 +454,206 @@
 		</div>
 	{/if}
 
-	<!-- Error state: in-map error card -->
+	<!-- Error state: in-map bottom sheet -->
 	{#if query.isError}
 		<div
-			class="absolute inset-x-4 top-1/2 z-[999] -translate-y-1/2 rounded-[14px] bg-white p-6 text-center shadow-xl"
+			class="edge-sheet edge-sheet--danger"
+			role="alertdialog"
+			aria-modal="false"
+			aria-labelledby="peta-error-title"
+			aria-describedby="peta-error-body"
 		>
-			<div
-				class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full"
-				style="background: var(--color-danger-bg); color: var(--color-danger-ink);"
-			>
-				<GlobeOff />
+			<div class="edge-sheet__icon edge-sheet__icon--danger" aria-hidden="true">
+				<GlobeOff class="size-5" />
 			</div>
-			<p class="mb-1 text-sm font-bold" style="color: var(--color-ink);">
-				{m.peta_map_error_title()}
-			</p>
-			<p class="mb-4 text-xs leading-relaxed" style="color: var(--color-ink-3);">
-				{m.peta_map_error_body()}
-			</p>
+			<div class="edge-sheet__copy">
+				<p id="peta-error-title" class="edge-sheet__title">
+					{m.peta_map_error_title()}
+				</p>
+				<p id="peta-error-body" class="edge-sheet__body">{m.peta_map_error_body()}</p>
+			</div>
 			<button
 				onclick={() => query.refetch()}
-				class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white"
-				style="background: var(--color-orange);"
+				class="edge-sheet__button edge-sheet__button--primary"
 			>
 				{m.peta_map_error_retry()}
 			</button>
 		</div>
 	{/if}
 
-	<!-- Empty state: in-map empty card (resolved, 0 events) -->
-	{#if !query.isPending && !query.isError && events.length === 0}
-		<div class="absolute top-1/2 right-0 left-0 z-[999] -translate-y-1/2 px-9 text-center">
-			<div
-				class="mx-auto mb-3 grid h-[52px] w-[52px] place-items-center rounded-full border shadow-md"
-				style="background: white; border-color: var(--color-line); color: var(--color-ink-3);"
-			>
-				<Map class="size-6" />
+	<!-- Location denied/unavailable: warm popup over the live map -->
+	{#if showLocationNotice}
+		<div
+			class="edge-sheet"
+			role="status"
+			aria-live="polite"
+			aria-labelledby="peta-location-title"
+			aria-describedby="peta-location-body"
+		>
+			<div class="edge-sheet__icon" aria-hidden="true">
+				<MapPin class="size-5" />
 			</div>
-			<p class="mb-1 text-sm font-bold" style="color: var(--color-ink);">
-				{m.peta_map_empty_title()}
-			</p>
-			<p class="mb-3 text-xs leading-snug" style="color: var(--color-ink-3);">
-				{m.peta_map_empty_body()}
-			</p>
-			<button
-				onclick={() => {
-					const tomorrow = dateStrip[1];
-					if (tomorrow) eventsView.selectDate(tomorrow.iso);
-				}}
-				class="rounded-[18px] border-none px-4 py-2 text-xs font-semibold text-white"
-				style="background: var(--color-ink);"
-			>
-				{m.peta_map_empty_action()}
-			</button>
+			<div class="edge-sheet__copy">
+				<p id="peta-location-title" class="edge-sheet__title">
+					{location.permission === 'denied'
+						? m.peta_location_denied_title()
+						: m.peta_location_unavailable_title()}
+				</p>
+				<p id="peta-location-body" class="edge-sheet__body">
+					{m.peta_location_default_body()}
+				</p>
+			</div>
+			<div class="edge-sheet__actions">
+				<button
+					class="edge-sheet__button edge-sheet__button--primary"
+					onclick={() => {
+						location.useDefaultCenter();
+						locationNoticeDismissed = true;
+					}}
+				>
+					{m.peta_location_default_action()}
+				</button>
+				<button
+					class="edge-sheet__button edge-sheet__button--secondary"
+					onclick={() => {
+						locationNoticeDismissed = false;
+						location.requestGps();
+					}}
+				>
+					{m.peta_location_retry_action()}
+				</button>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Empty state: in-map bottom sheet (resolved, 0 events) -->
+	{#if !query.isPending && !query.isError && events.length === 0 && !showLocationNotice}
+		<div
+			class="empty-sheet"
+			role="status"
+			aria-live="polite"
+			aria-labelledby="peta-empty-title"
+			aria-describedby="peta-empty-body"
+		>
+			<div class="empty-sheet__head">
+				<div class="edge-sheet__icon" aria-hidden="true">
+					<MapIcon class="size-6" />
+				</div>
+				<div class="edge-sheet__copy">
+					<p id="peta-empty-title" class="edge-sheet__title">{m.peta_map_empty_title()}</p>
+					<p id="peta-empty-body" class="edge-sheet__body">
+						{m.peta_map_empty_body({
+							radius: eventsView.selectedRadiusKm,
+							nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
+						})}
+					</p>
+				</div>
+			</div>
+			<div class="edge-sheet__actions">
+				<button class="edge-sheet__button edge-sheet__button--primary" onclick={expandRadius}>
+					{eventsView.selectedRadiusKm >= MAX_RADIUS_KM
+						? m.peta_radius_max_action()
+						: m.peta_radius_expand_action({
+								radius: nextRadiusKm(eventsView.selectedRadiusKm)
+							})}
+				</button>
+				<button
+					class="edge-sheet__button edge-sheet__button--secondary"
+					onclick={() => chooseDate(tomorrowIso)}
+				>
+					{m.peta_map_empty_tomorrow_action()}
+				</button>
+			</div>
+			{#if fallbackPlaces.length > 0}
+				<div class="fallback-places">
+					<p class="fallback-places__title">{m.peta_future_places_title()}</p>
+					{#each fallbackPlaces as place (place.id)}
+						<button class="fallback-place" onclick={() => navigateToPlace(place.id)}>
+							<span class="fallback-place__pin" aria-hidden="true">
+								<MapPin class="size-4" />
+							</span>
+							<span class="fallback-place__meta">
+								<span class="fallback-place__name">{place.name}</span>
+								<span class="fallback-place__sub">
+									{m.peta_future_place_meta({
+										count: place.count,
+										date: place.nextLabel
+									})}
+								</span>
+							</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/if}
 
 	<!-- Floating filter chips at map top -->
-	<MapFilterChips chips={filterChips} onselect={(key) => eventsView.selectDate(key)} />
+	<MapFilterChips
+		chips={filterChips}
+		onselect={(key) => {
+			activeFilterSheet = activeFilterSheet === key ? null : (key as 'date' | 'subject');
+		}}
+	/>
+
+	{#if activeFilterSheet === 'date'}
+		<div class="filter-sheet" role="dialog" aria-label={m.peta_date_sheet_title()}>
+			<div class="filter-sheet__header">
+				<CalendarDays class="size-4" aria-hidden="true" />
+				<span>{m.peta_date_sheet_title()}</span>
+			</div>
+			<div class="filter-sheet__options">
+				<button class:active={activeDay === dateStrip[0].iso} onclick={() => chooseDate(null)}>
+					{m.peta_filter_date_today()}
+				</button>
+				<button class:active={activeDay === tomorrowIso} onclick={() => chooseDate(tomorrowIso)}>
+					{m.peta_filter_date_tomorrow()}
+				</button>
+				<label>
+					<span>{m.peta_filter_date_custom()}</span>
+					<input
+						type="date"
+						value={activeDay}
+						onchange={(event) => {
+							const value = event.currentTarget.value;
+							if (value) chooseDate(value);
+						}}
+					/>
+				</label>
+			</div>
+		</div>
+	{/if}
+
+	{#if activeFilterSheet === 'subject'}
+		<div
+			class="filter-sheet filter-sheet--subject"
+			role="dialog"
+			aria-label={m.peta_subject_sheet_title()}
+		>
+			<div class="filter-sheet__header">
+				<ListFilter class="size-4" aria-hidden="true" />
+				<span>{m.peta_subject_sheet_title()}</span>
+			</div>
+			<div class="subject-list">
+				<button
+					class:active={eventsView.selectedSubjectId == null}
+					onclick={() => chooseSubject(null)}
+				>
+					{m.peta_filter_subject_all()}
+				</button>
+				{#each subjects as subject (subject.id ?? subject.slug ?? l10n(subject.name))}
+					{#if subject.id}
+						<button
+							class:active={eventsView.selectedSubjectId === subject.id}
+							onclick={() => chooseSubject(subject.id ?? null)}
+						>
+							{l10n(subject.name)}
+						</button>
+					{/if}
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<!-- GPS FAB — bottom-right, lifts above pin sheet when open.
 	     --map-fab-bottom inherited from the container via CSS variable cascade. -->
@@ -341,7 +661,6 @@
 
 	<!-- Pin sheet — shown when a place is selected -->
 	{#if eventsView.selectedPlaceId != null && sheetPlace != null}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- navigates to /kajian/{event_id} (UUID) and /masjid/{place_id}; routes land in phase D. -->
 		<PinSheet
 			place={sheetPlace}
 			events={sheetEvents}
@@ -370,3 +689,266 @@
 		></button>
 	{/if}
 </div>
+
+<style>
+	.edge-sheet,
+	.empty-sheet,
+	.filter-sheet {
+		position: absolute;
+		left: 12px;
+		right: 12px;
+		z-index: 999;
+		background: color-mix(in srgb, var(--color-paper) 96%, white);
+		border: 1px solid var(--color-line);
+		box-shadow: var(--shadow-lg);
+		backdrop-filter: blur(10px);
+	}
+
+	.edge-sheet,
+	.empty-sheet {
+		bottom: 12px;
+		border-radius: var(--radius-lg);
+		padding: 14px;
+	}
+
+	.edge-sheet {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 10px;
+		align-items: start;
+	}
+
+	.edge-sheet--danger {
+		border-color: var(--color-danger-bg);
+	}
+
+	.edge-sheet__icon {
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-sm);
+		background: var(--color-orange-50);
+		color: var(--color-orange-700);
+		display: grid;
+		place-items: center;
+		flex-shrink: 0;
+	}
+
+	.edge-sheet__icon--danger {
+		background: var(--color-danger-bg);
+		color: var(--color-danger-ink);
+	}
+
+	.edge-sheet__copy {
+		min-width: 0;
+	}
+
+	.edge-sheet__title {
+		margin: 0;
+		color: var(--color-ink);
+		font-size: 14px;
+		font-weight: 800;
+		line-height: 1.25;
+	}
+
+	.edge-sheet__body {
+		margin: 3px 0 0;
+		color: var(--color-ink-3);
+		font-size: 12px;
+		line-height: 1.45;
+	}
+
+	.edge-sheet__actions {
+		grid-column: 1 / -1;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		margin-top: 2px;
+	}
+
+	.edge-sheet__button {
+		min-height: 34px;
+		border-radius: 17px;
+		padding: 0 13px;
+		border: 1px solid var(--color-line);
+		font-family: inherit;
+		font-size: 12px;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.edge-sheet__button--primary {
+		background: var(--color-ink);
+		border-color: var(--color-ink);
+		color: var(--color-paper);
+	}
+
+	.edge-sheet__button--secondary {
+		background: var(--color-paper-2);
+		color: var(--color-ink-2);
+	}
+
+	.edge-sheet__button:focus-visible,
+	.filter-sheet button:focus-visible,
+	.filter-sheet input:focus-visible,
+	.fallback-place:focus-visible {
+		outline: 2px solid var(--color-orange);
+		outline-offset: 2px;
+	}
+
+	.empty-sheet__head {
+		display: flex;
+		gap: 10px;
+		align-items: flex-start;
+	}
+
+	.fallback-places {
+		margin-top: 12px;
+		padding-top: 10px;
+		border-top: 1px solid var(--color-line);
+	}
+
+	.fallback-places__title {
+		margin: 0 0 8px;
+		color: var(--color-ink-3);
+		font-size: 11px;
+		font-weight: 800;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.fallback-place {
+		width: 100%;
+		display: flex;
+		gap: 9px;
+		align-items: center;
+		border: 0;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		padding: 7px 6px;
+		text-align: left;
+		font-family: inherit;
+		cursor: pointer;
+	}
+
+	.fallback-place:hover {
+		background: var(--color-paper-2);
+	}
+
+	.fallback-place__pin {
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		display: grid;
+		place-items: center;
+		background: var(--color-orange-50);
+		color: var(--color-orange-700);
+		flex-shrink: 0;
+	}
+
+	.fallback-place__meta {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.fallback-place__name {
+		color: var(--color-ink);
+		font-size: 12.5px;
+		font-weight: 800;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.fallback-place__sub {
+		color: var(--color-ink-3);
+		font-size: 11px;
+	}
+
+	.filter-sheet {
+		top: 48px;
+		border-radius: var(--radius);
+		padding: 10px;
+		max-height: min(420px, calc(100dvh - 8rem));
+	}
+
+	.filter-sheet--subject {
+		max-height: min(460px, calc(100dvh - 8rem));
+	}
+
+	.filter-sheet__header {
+		display: flex;
+		align-items: center;
+		gap: 7px;
+		color: var(--color-ink);
+		font-size: 12px;
+		font-weight: 800;
+		margin-bottom: 8px;
+	}
+
+	.filter-sheet__options,
+	.subject-list {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.subject-list {
+		overflow-y: auto;
+		max-height: 340px;
+		padding-right: 2px;
+	}
+
+	.filter-sheet button,
+	.filter-sheet label {
+		min-height: 36px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-line);
+		background: var(--color-paper-2);
+		color: var(--color-ink-2);
+		font-family: inherit;
+		font-size: 12px;
+		font-weight: 700;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 0 11px;
+	}
+
+	.filter-sheet button {
+		cursor: pointer;
+	}
+
+	.filter-sheet button.active {
+		background: var(--color-ink);
+		border-color: var(--color-ink);
+		color: var(--color-paper);
+	}
+
+	.filter-sheet input {
+		border: 1px solid var(--color-line);
+		border-radius: var(--radius-sm);
+		background: var(--color-paper);
+		color: var(--color-ink);
+		font-family: inherit;
+		font-size: 12px;
+		padding: 4px 7px;
+	}
+
+	@media (min-width: 640px) {
+		.edge-sheet,
+		.empty-sheet {
+			right: 18px;
+			left: auto;
+			width: 360px;
+		}
+
+		.filter-sheet {
+			left: 10px;
+			right: auto;
+			width: 320px;
+		}
+	}
+</style>

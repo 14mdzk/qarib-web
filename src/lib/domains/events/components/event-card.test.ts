@@ -8,9 +8,12 @@
  * Conformance: rule .claude/rules/testing.md (unit tests for pure logic).
  */
 import { describe, it, expect } from 'vitest';
+import { render } from 'svelte/server';
 import { formatTime, formatDistance } from '$lib/shared/utils/date.js';
 import { prayerIntToLabel } from '$lib/shared/utils/prayer.js';
 import { statusKey } from '$domains/events/schema.js';
+import type { EventSeriesResponse } from '$domains/events/schema.js';
+import EventCard from './event-card.svelte';
 
 // ---------------------------------------------------------------------------
 // href derivation — mirrors the $derived expression in event-card.svelte:
@@ -23,6 +26,34 @@ function deriveHref(eventId: string | null | undefined): string | null {
 	if (!eventId) return null;
 	// Mirror the resolve output: base is '' in tests, route becomes /kajian/{id}
 	return `/kajian/${eventId}`;
+}
+
+function makeSeries(overrides: Partial<EventSeriesResponse> = {}): EventSeriesResponse {
+	return {
+		id: 'series-uuid-001',
+		name: { id: 'Kajian Tauhid' },
+		date_start: '2026-06-08T19:00:00+07:00',
+		date_end: null,
+		date_prayer: 2,
+		subject_id: 'subject-uuid-001',
+		place_id: 'place-uuid-001',
+		asatidz_id: 'asatidz-uuid-001',
+		place: {
+			id: 'place-uuid-001',
+			slug: 'masjid-al-falah',
+			name: { id: 'Masjid Al-Falah' },
+			address: 'Jl. Contoh No. 1, Cirebon',
+			lat: -6.732,
+			lng: 108.5523
+		},
+		asatidz: {
+			id: 'asatidz-uuid-001',
+			slug: 'ustadz-ahmad',
+			name: { id: 'Ustadz Ahmad' },
+			alias_name: { id: 'Ustadz Ahmad' }
+		},
+		...overrides
+	} as EventSeriesResponse;
 }
 
 describe('EventCard formatting utilities', () => {
@@ -146,5 +177,33 @@ describe('EventCard href derivation', () => {
 
 	it('returns null when event_id is an empty string — card is non-linkable', () => {
 		expect(deriveHref('')).toBeNull();
+	});
+});
+
+describe('EventCard interactive structure', () => {
+	it('renders the main card link as a sibling of metadata buttons, not a button wrapper', () => {
+		const { body } = render(EventCard, {
+			props: {
+				series: makeSeries(),
+				subjectName: 'Tauhid'
+			}
+		});
+
+		expect(body).toContain('href="/kajian/series-uuid-001"');
+		expect(body).toMatch(/class="event-card__main-link\b/);
+		expect(body).toMatch(/<button type="button" class="subject-pill\b/);
+		expect(body).toMatch(/<button type="button" class="meta-action\b/);
+		expect(body).not.toMatch(/<a\b(?:(?!<\/a>).)*<button\b/s);
+	});
+
+	it('renders a non-linkable card without a main anchor when no event id is available', () => {
+		const { body } = render(EventCard, {
+			props: {
+				series: makeSeries({ id: '' })
+			}
+		});
+
+		expect(body).not.toContain('event-card__main-link');
+		expect(body).toContain('aria-label="Kajian Tauhid"');
 	});
 });

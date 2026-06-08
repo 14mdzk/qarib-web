@@ -33,8 +33,10 @@ const KEY = Symbol('location');
 
 export type GetPositionFn = (
 	success: (pos: { coords: { latitude: number; longitude: number } }) => void,
-	error: (err: { message: string }) => void
+	error: (err: { message: string; code?: number }) => void
 ) => void;
+
+export type LocationPermissionState = 'idle' | 'requesting' | 'granted' | 'denied' | 'unavailable';
 
 // ---------------------------------------------------------------------------
 // Service class
@@ -45,6 +47,7 @@ export class LocationService {
 	mode = $state<'gps' | 'default'>('default');
 	granted = $state(false);
 	requesting = $state(false);
+	permission = $state<LocationPermissionState>('idle');
 
 	private readonly _getPosition: GetPositionFn;
 
@@ -65,10 +68,10 @@ export class LocationService {
 
 	/** Request GPS permission. On success, updates center + mode. On failure, keeps the default. */
 	requestGps(): void {
-		if (typeof navigator === 'undefined') return;
 		if (this.requesting) return;
 
 		this.requesting = true;
+		this.permission = 'requesting';
 
 		this._getPosition(
 			(pos) => {
@@ -76,14 +79,30 @@ export class LocationService {
 				this.granted = true;
 				this.mode = 'gps';
 				this.requesting = false;
+				this.permission = 'granted';
 				this._persistCenter(this.center);
 			},
-			() => {
-				// Geolocation denied or unavailable — keep default center.
-				this.mode = 'default';
-				this.requesting = false;
+			(err) => {
+				this.useDefaultCenter();
+				this.permission = this._classifyPermissionError(err);
 			}
 		);
+	}
+
+	/** Keep or restore the pilot-region center without implying GPS was granted. */
+	useDefaultCenter(): void {
+		this.center = { ...DEFAULT_CENTER };
+		this.mode = 'default';
+		this.granted = false;
+		this.requesting = false;
+	}
+
+	private _classifyPermissionError(err: {
+		message: string;
+		code?: number;
+	}): LocationPermissionState {
+		if (err.code === 1 || /denied|permission/i.test(err.message)) return 'denied';
+		return 'unavailable';
 	}
 
 	private _hydrateFromStorage(): void {

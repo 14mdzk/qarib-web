@@ -23,6 +23,12 @@ type EventRecurringResponse = components['schemas']['EventRecurringResponse'];
 /** Shorthand for a single event series template from the generated schema. */
 type EventSeriesResponse = components['schemas']['EventSeriesResponse'];
 
+/** Shorthand for a single place from the generated schema. */
+type PlaceResponse = components['schemas']['PlaceResponse'];
+
+/** Shorthand for a single subject from the generated schema. */
+type SubjectResponse = components['schemas']['SubjectResponse'];
+
 // ---------------------------------------------------------------------------
 // URL helper
 // ---------------------------------------------------------------------------
@@ -340,6 +346,37 @@ export const Endpoints = {
 	// ---------------------------------------------------------------------------
 
 	/**
+	 * List places (masjid), optionally near a lat/lng.
+	 */
+	'places.list': defineEndpoint<
+		{
+			cursor?: string;
+			limit?: number;
+			search?: string;
+			region_id?: string;
+			is_active?: boolean;
+			near_lat?: number;
+			near_lng?: number;
+			radius_km?: number;
+		},
+		void,
+		Paginated<PlaceResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/places${qs({
+				cursor: a.cursor,
+				limit: a.limit,
+				search: a.search,
+				region_id: a.region_id,
+				is_active: a.is_active,
+				near_lat: a.near_lat,
+				near_lng: a.near_lng,
+				radius_km: a.radius_km
+			})}`
+	}),
+
+	/**
 	 * Single place (masjid) by UUID.
 	 *
 	 * Used by the `/masjid/[id]` route. Public endpoint — no auth required.
@@ -374,6 +411,29 @@ export const Endpoints = {
 	// ---------------------------------------------------------------------------
 	// Subject domain
 	// ---------------------------------------------------------------------------
+
+	/**
+	 * List subjects (tema kajian).
+	 */
+	'subject.list': defineEndpoint<
+		{
+			cursor?: string;
+			limit?: number;
+			search?: string;
+			is_active?: boolean;
+		},
+		void,
+		Paginated<SubjectResponse[]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/subjects${qs({
+				cursor: a.cursor,
+				limit: a.limit,
+				search: a.search,
+				is_active: a.is_active
+			})}`
+	}),
 
 	/**
 	 * Single subject (Islamic topic / tema kajian) by UUID.

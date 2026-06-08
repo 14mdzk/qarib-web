@@ -151,6 +151,7 @@ export function defineNearbyInfiniteQuery(
 	 */
 	optionsGetter: () => {
 		args: NearbyArgs;
+		enabled?: boolean;
 		initialData?: InfiniteData<Paginated<EventRecurringResponse[]>, string | null>;
 	},
 	/**
@@ -170,7 +171,7 @@ export function defineNearbyInfiniteQuery(
 		string | null
 	>(
 		() => {
-			const { args, initialData } = optionsGetter();
+			const { args, enabled, initialData } = optionsGetter();
 			return {
 				queryKey: eventKeys.nearby(args),
 				queryFn: ({ pageParam, signal }) =>
@@ -182,6 +183,7 @@ export function defineNearbyInfiniteQuery(
 					}),
 				initialPageParam: null,
 				getNextPageParam: nearbyNextPageParam,
+				enabled,
 				// Mark SSR-seeded data as fresh for `staleTime` so TanStack does not
 				// immediately background-refetch page 1 on every mount — which would
 				// duplicate the SSR fetch and waste a round-trip.
