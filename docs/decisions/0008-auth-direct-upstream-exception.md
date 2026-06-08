@@ -1,11 +1,15 @@
 # 0008 — Auth Lifecycle Direct-Upstream-Fetch Exception
 
-- **Status:** Proposed
+- **Status:** Superseded for Qarib Web v1 by ADR 0009 and ADR 0012
 - **Date:** 2026-05-08
 - **Deciders:** Kaito, Ren
 - **Tags:** auth, api, exception
 
 ## Context
+
+> **Current scope note:** this ADR documents a pre-v1 auth-lifecycle exception.
+> Qarib Web v1 stripped login/session/token handling. The active BFF model is
+> public read-through GETs with no Authorization header.
 
 `.claude/rules/api-contract.md` is unambiguous:
 

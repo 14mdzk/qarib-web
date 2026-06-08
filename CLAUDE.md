@@ -1,8 +1,18 @@
-# ${PROJECT_NAME}
+# Qarib Web
 
-Resilient, scalable SvelteKit + TypeScript frontend boilerplate. Designed to be the long-lived starting point for product UIs that talk to hexagonal-style backends (e.g. `goscratch`).
+SvelteKit public web launch surface for discovering kajian/events, places,
+ustadz, and topics. v1 is no-account, Bahasa-first, public read-only, SSR, and
+backed by a same-origin read-through BFF.
 
-> `${PROJECT_NAME}` is a placeholder used across docs, agents, and rules. Replace at fork time, or keep parametrized for reuse.
+Current topology:
+
+```text
+qarib-cms writes content/schema -> qarib-api runtime serves public reads -> qarib-web presents -> native mobile later
+```
+
+The browser must not call the qarib-api runtime directly. Route loads and client
+navigation use Qarib Web's typed API layer, which targets `/api/upstream` for
+public GET reads.
 
 ## Source of truth
 
@@ -15,16 +25,25 @@ Resilient, scalable SvelteKit + TypeScript frontend boilerplate. Designed to be 
 | Best practices, findings, anti-patterns | Obsidian wiki — see `.claude/CLAUDE.md` for the access protocol |
 | Operational guides (add domain, add route…) | `docs/guides/` |
 | Always-applied behavioral rules | `.claude/rules/` |
-| Persona team and specialist agents | `.claude/agents/` |
+| Persona team and specialist agents | root roster at `/Users/maulanazain/Documents/Projects/qarib/.claude/agents/` |
 
 ## Reading order for any agent
 
-1. `.claude/agents/team.md` — team protocols, hierarchy, communication
-2. `.claude/agents/<your-name>.md` — your persona, ownership, deferrals
-3. `.claude/rules/*.md` — non-negotiable rules
-4. `docs/charter.md` — what we are building and why
-5. `docs/architecture/overview.md` — the shape of the system
-6. Obsidian wiki — query relevant concept pages via the protocol in `.claude/CLAUDE.md` (start with `wiki/hot.md`, then `wiki/index.md`, then domain `wiki/concepts/`). Concept pages relevant here live under the **frontend** domain, e.g. [[Svelte 5 Reactive Collection Pitfall]], [[Module Singleton Store Anti-Pattern]], [[Context-DI for Runes Stores]], [[SvelteKit SSR Cookie Session BFF]], [[Endpoint Registry Pattern]], [[OpenAPI Codegen for SvelteKit]], [[Domain Folder Per Backend Module]], [[Hybrid shadcn Fork Strategy]].
+1. `docs/charter.md` — Qarib product scope, topology, and non-goals.
+2. `docs/roadmap.md` — shipped and in-flight vertical slices.
+3. `docs/architecture/overview.md` — current public web architecture.
+4. `docs/decisions/0009-public-no-auth-web-v1.md` and
+   `docs/decisions/0012-read-through-bff.md` — current auth/BFF truth.
+5. `.claude/rules/*.md` — rules to check before constrained work. If a rule
+   conflicts with ADR 0009/0012, treat the ADR as the current Qarib v1 scope and
+   flag the rule for reconciliation instead of implementing stale auth/session
+   behavior.
+6. Team roster: use the root roster as the actual available team source:
+   `/Users/maulanazain/Documents/Projects/qarib/.claude/agents/`. If this
+   worktree also has `.claude/agents/`, ignore stale local personas and prefer
+   the root roster.
+7. Obsidian wiki — only when project context is missing and per
+   `.claude/CLAUDE.md` (start with `wiki/hot.md`).
 
 Never act before reading the rules that govern your task. The rules override default behavior; user instructions override the rules.
 
@@ -37,11 +56,19 @@ Every PR must:
 - be the product of a **dispatched agent** (persona or specialist) — see `.claude/rules/agent-dispatch.md`. The main thread orchestrates and reviews; it does not implement in place when delegation is the right call.
 - have **every task in scope marked complete** before the PR is opened. No follow-up PR exists whose only purpose is to flip a task to `completed`.
 
+For current Qarib Web v1, do not add login, session guards, favorites/follows,
+Bearer injection, mutating BFF routes, or browser-direct qarib-api calls unless
+a new accepted ADR supersedes ADR 0009 and ADR 0012. That old boilerplate path
+is historical, not latent product strategy.
+
 If you cannot find a rule that covers your situation, do not invent one in code. Open a discussion (or write an ADR draft) and pause.
 
 ## Specialist agents
 
-In addition to the persona team, this repo ships utility specialists under `.claude/agents/` (`code-reviewer`, `test-automator`, `api-designer`, `sql-pro`, `docker-expert`, `documentation-engineer`). Personas dispatch them for craft-specific work — see `team.md` "Specialist Roster".
+Use the root specialist roster as the source of truth:
+`/Users/maulanazain/Documents/Projects/qarib/.claude/agents/`. It contains the
+active specialist list for this workspace; do not hard-code a stale local
+roster.
 
 ## License
 

@@ -1,16 +1,21 @@
-# surfaceit
+# Qarib Web
 
-A long-lived SvelteKit + TypeScript frontend boilerplate for products that talk
-to hexagonal-style backends (the first concrete consumer is `goscratch`).
-Every fork inherits a working SSR auth surface, a typed API client, a real-time
-pipeline, an i18n harness, a testing stack, and a documented design discipline —
-so the next product never starts from zero. This repo is the **substrate**, not
-a product. See [`docs/charter.md`](docs/charter.md) for the full intent and
-non-goals.
+Qarib Web is the SvelteKit public launch surface for discovering kajian/events,
+places, ustadz, and topics. v1 is **no-account**, **Bahasa-first**,
+**public read-only**, and server-rendered. The browser talks to Qarib Web only;
+Qarib Web reads from the **qarib-api runtime** through the same-origin
+`/api/upstream` BFF.
 
-> `surfaceit` is the working name. The charter parametrizes it as
-> `${PROJECT_NAME}` so a fork can rename in one pass. Do not rename in source
-> until forking.
+Topology:
+
+```text
+qarib-cms writes content/schema -> qarib-api runtime serves public reads -> qarib-web presents -> native mobile later
+```
+
+`qarib-cms` owns authoring and write/schema workflows. `qarib-api` owns the
+read contract. `qarib-web` owns presentation, browse UX, SSR, cache/tracing, and
+client-safe public discovery flows. Native mobile is intentionally later, not a
+v1 surface.
 
 ## Quickstart
 
@@ -42,6 +47,11 @@ Aliases (`$core`, `$shared`, `$domains`, `$server`, `$generated`, `$routes`,
 `$messages`) are wired in `svelte.config.js`. Use them; never reach into a
 sibling domain by relative path.
 
+Current public routes live under `src/routes/(app)/` and are unguarded in v1:
+`/peta`, `/kajian/[id]`, `/tempat/[id]`, `/ustadz/[id]`, and `/tema/[id]`.
+The landing page lives under `src/routes/(marketing)/`. BFF endpoints live under
+`src/routes/api/`, including `/api/upstream` for qarib-api public GET reads.
+
 ## How to read the docs
 
 Read in this order. Each layer answers a different question.
@@ -53,8 +63,8 @@ Read in this order. Each layer answers a different question.
 3. **[`docs/architecture/overview.md`](docs/architecture/overview.md)** — the
    shape of the system: layers, trust boundaries, data flow, error model.
 4. **[`docs/decisions/`](docs/decisions/)** — Architecture Decision Records.
-   Read 0001–0006 before proposing an alternative; they explain why each
-   constraint exists.
+   Read 0009 and 0012 before proposing auth or BFF changes; older auth ADRs are
+   historical unless a new account feature explicitly supersedes the v1 model.
 5. **[`docs/guides/`](docs/guides/)** — recipes for common tasks (add a
    domain, add a route, run tests).
 6. **[`.claude/rules/`](.claude/rules/)** — non-negotiable rules every
@@ -67,19 +77,19 @@ as concept pages in the personal Obsidian wiki — see
 
 ## Status
 
-Phase progress tracks
-[`docs/roadmap.md`](docs/roadmap.md). Reference Phase 1 features as shipped;
-Phase 2 features land per-PR and are documented in the changelog only when
-merged.
+Phase progress tracks [`docs/roadmap.md`](docs/roadmap.md). The current product
+is already past boilerplate foundation: landing, app shell, public BFF reads,
+events/map, places, ustadz, and subject browse are landed; search is in flight.
 
-| Phase | Theme                                                                                                               | Status                                           |
-| ----- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| 0     | Foundation — docs, rules, ADRs 0001–0006                                                                            | done                                             |
-| 1     | Skeleton wiring — SvelteKit shell, hooks pipeline, Vitest, Playwright, CI                                           | done (see `CHANGELOG.md` `[Unreleased] Phase 1`) |
-| 2     | Core primitives — `core/api`, `core/auth`, `core/realtime`, `core/query`, `core/config`, `core/logger`, `core/i18n` | in flight                                        |
-| 3     | Reusable shells — primitives, composites, `_template` domain, BFF proxy, login flow                                 | pending                                          |
-| 4     | Codegen + DX — `openapi-typescript` wired, scaffolding scripts, guides filled out                                   | pending                                          |
-| 5     | Hardening — Lighthouse a11y ≥ 95, header integration tests, perf budget in CI                                       | pending                                          |
+| Phase | Theme                                                                | Status      |
+| ----- | -------------------------------------------------------------------- | ----------- |
+| 0     | Foundation docs, rules, and initial ADRs                             | done        |
+| A     | Qarib fork foundation, no-account app shell, public read-through BFF | done        |
+| B     | Landing page                                                         | done        |
+| C     | Events/map core browse flow                                          | done        |
+| D     | Places detail + upcoming kajian                                      | done        |
+| E     | Ustadz profile + active kajian                                       | done        |
+| F     | Subjects + search                                                    | in progress |
 
 ## Contributing
 

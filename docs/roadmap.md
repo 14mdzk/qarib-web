@@ -37,7 +37,7 @@ phases add content, never re-invent the frame.
 
 - [x] **Docs / identity**: this charter + roadmap + ADRs 0009-0012; replace `${PROJECT_NAME}` → `Qarib` across `docs/`, `CLAUDE.md`, `package.json`.
 - [x] **Strip the unused auth surface** (ADR 0009): remove `(auth)/login`, `(auth)/logout`, the session guard in `(app)/+layout.server.ts`, auth e2e specs; simplify `hooks.server.ts` (drop session resolution + auth-CSRF; keep CSP, request-id, `handleError`); simplify the BFF (`api/upstream/[...path]`) to a **public read-through** proxy (forward GET, strip client cookies, add request-id + cache headers, no Bearer). Supersede `auth-and-session.md` scope via ADR.
-- [x] **Locale → `id`** (ADR 0010): default locale `id`, `messages/id.json`, drop the en switcher (keep the i18n layer + facade).
+- [x] **Locale → `id`** (ADR 0010): default locale `id`; ship `messages/id.json`; remove the old English picker (keep the i18n layer + facade).
 - [x] **App shell** (`(app)/+layout.svelte`): two header modes — `MTopBar` (logo + search) for the map home, `MTopBarBack` (back + title + overflow) for inner pages; route decides the mode. Responsive nav. Shared `loading` / `error` / `empty` states.
 - [x] **First primitives** (forked shadcn per ADR 0002, under `shared/primitives`): `Button`, `IconButton`, `Card`, `Badge`/`Pill`, `Skeleton`; shell pieces `Header`, `BackButton`.
 - [x] **Port shared utils from qarib-cms** (reskinned to tokens): `date`/hijri, `names` (Arabic), `prayer`; base Zod schemas. (`cn` already present.)
@@ -72,7 +72,7 @@ responsive, a11y ≥ 95.
 - [x] `domains/events`: **schema** (occurrence `EventRecurring` + `EventSeries`, from generated types + Zod at boundaries), **service** (typed client: `/events`, `/events/nearby`, `/events/:id`, `/events/series/:slug` (+`/upcoming`, `/recurrings`)), **queries** (svelte-query keys + **cursor** pagination — composite cursors for nearby), **store** (map filters + geolocation + selected pin, context-DI runes).
 - [x] **`MapView` composite**: Leaflet **client-only island** + Stadia/Stamen styled tiles (key via env), pins with **tier styling** (port `pinTierService` from cms), user-location dot, bottom-sheet/callout.
 - [x] Route **`/peta`** (map home, `MTopBar`, no back): map ↔ list toggle, date strip, subject chips, nearby feed (`lat`+`lng` **or** `region_id`), geolocation permission + region fallback.
-- [x] Route **`/kajian/[slug]`** (detail, `MTopBarBack`): time + prayer anchor, masjid, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
+- [x] Route **`/kajian/[id]`** (detail, `MTopBarBack`): time + prayer anchor, venue, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
 - [x] **Tests**: service/store/schema unit (MSW), e2e (open `/peta` → pins → open a kajian).
 
 **Exit:** a visitor opens `/peta`, sees nearby kajian pins, filters by date/tema,
@@ -85,7 +85,7 @@ and opens a kajian detail — all SSR, all public.
 **Goal:** venue detail + the venue's kajian calendar.
 
 - [x] `domains/places`: schema/service/queries (`/places`, `/places/:id`).
-- [x] Route **`/tempat/[id]`** (generalized from `/masjid/[id]`): venue info, mini-map, **upcoming kajian** (reuse the events service + `EventCard`).
+- [x] Route **`/tempat/[id]`**: venue info, mini-map, **upcoming kajian** (reuse the events service + `EventCard`).
 - [x] **Tests**: service unit + e2e.
 
 **Exit:** from a kajian or a map pin, a user opens the venue page and sees its upcoming kajian calendar.
@@ -110,7 +110,7 @@ and opens a kajian detail — all SSR, all public.
 
 - [x] `domains/subjects`: schema/service/queries (`/subjects`, `/subjects/:id`).
 - [x] Route **`/tema/[id]`**: subject + its kajian (events by `subject_id`).
-- [ ] Route **`/cari`**: search across kajian / masjid / ustadz / tema (api filters where available).
+- [ ] Route **`/cari`**: search across kajian / tempat / ustadz / tema (api filters where available).
 - [ ] **Tests**: service unit + e2e (search returns + navigates).
 
 **Exit:** browse by tema and search both work end-to-end.
@@ -133,4 +133,4 @@ PRs), PR with the completed task checklist, then merge. See
 
 ## Out of scope until later
 
-User accounts/favorites/follow · native mobile · multi-locale (en/ar) · realtime/SSE · any write path · content authoring (CMS owns it).
+User accounts/favorites/follow · native mobile · multi-locale (en/ar) · realtime channels · any write path · content authoring (CMS owns it).

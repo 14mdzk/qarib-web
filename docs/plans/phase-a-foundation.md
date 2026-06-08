@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use `superpowers:subagent-driven-development` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax. Each task = one PR, on a feature branch in a git worktree, with an independent `reviewer` pass before merge (`.claude/rules/agent-dispatch.md`).
 
-**Goal:** Turn the surfaceit boilerplate into the Qarib web app's foundation — remove the unused auth surface, switch to a public read-through BFF, default to Bahasa, and build the app shell + first primitives every later page slots into.
+**Goal:** Turn the source boilerplate into the Qarib web app's foundation — remove the unused auth surface, switch to a public read-through BFF, default to Bahasa, and build the app shell + first primitives every later page slots into.
 
 **Architecture:** Public, no-account SvelteKit app (ADR 0009) → read-through BFF (ADR 0012) → qarib-api public reads. Bahasa-only locale (ADR 0010). Design tokens already landed; this phase builds the chrome and primitive layer on top.
 
@@ -29,8 +29,8 @@
 - Rewrite: `src/lib/server/bff-proxy.ts` (drop `accessToken`/Bearer; GET read-through; add cache headers)
 - Rewrite: `src/routes/api/upstream/[...path]/+server.ts` (drop CSRF/rate-limit/auth-path/Bearer; GET only)
 - Modify: `src/lib/server/bff-proxy.test.ts` (drop Bearer/accessToken assertions; assert no Authorization added)
-- Modify: `messages/en.json` (remove `auth_*` strings; we replace the catalog entirely in A2 — here just delete the now-dead auth keys to keep `check` honest)
-- Modify: `package.json` (`"name": "surfaceit"` → `"qarib-web"`), `src/app.html` (`<title>`/lang handled in A2)
+- Modify: current message catalog (remove `auth_*` strings; A2 replaces the old English catalog with Bahasa `id` — here just delete the now-dead auth keys to keep `check` honest)
+- Modify: `package.json` (old boilerplate package name → `"qarib-web"`), `src/app.html` (`<title>`/lang handled in A2)
 - Modify: `app.d.ts` / `src/app.d.ts` if `App.Locals.session` is typed there (drop `session`; keep `requestId`, `locale`)
 
 - [ ] **Step 1 — Failing test: BFF forwards a public GET with no Authorization.** In `src/lib/server/bff-proxy.test.ts`, replace the Bearer-injection test with:
@@ -146,7 +146,7 @@ export const GET: RequestHandler = async ({ params, request, locals }) => {
 </section>
 ```
 
-- [ ] **Step 8 — Delete dead surfaces**: `rm -rf src/routes/(auth) src/lib/core/auth e2e/auth.e2e.ts`. Remove `auth_*` keys from `messages/en.json`. Add `app_tagline` key used above (temporary; full catalog in A2). Drop `App.Locals.session` from `src/app.d.ts` (keep `requestId`, `locale`).
+- [ ] **Step 8 — Delete dead surfaces**: `rm -rf src/routes/(auth) src/lib/core/auth e2e/auth.e2e.ts`. Remove `auth_*` keys from the current message catalog. Add `app_tagline` key used above (temporary; full catalog in A2). Drop `App.Locals.session` from `src/app.d.ts` (keep `requestId`, `locale`).
 
 - [ ] **Step 9 — Identity**: `package.json` name → `qarib-web`. (Title/lang done in A2.)
 
@@ -176,7 +176,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Files:**
 - Modify: `project.inlang/settings.json` (`baseLocale: "id"`, `locales: ["id"]`)
 - Create: `messages/id.json` (Qarib Bahasa catalog)
-- Delete: `messages/en.json`
+- Remove: old English catalog
 - Modify: `src/app.html` (`<html lang="id">`)
 - Rewrite: `src/routes/+layout.svelte` (remove the locale `<select>`; reskin chrome from `bg-white/text-slate-*` → tokens `bg-surface/text-content`)
 - Modify: `src/routes/+layout.server.ts` if it returns `locale` for the switch (keep locale resolution; drop switch-only data) — read it first.
@@ -200,7 +200,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 }
 ```
 
-- [ ] **Step 3 — Delete `messages/en.json`**; run codegen: `bun run i18n:compile`. (Removes the `en` bundle so `m.*` resolves against `id`.)
+- [ ] **Step 3 — Remove the old English catalog**; run codegen: `bun run i18n:compile`. (Removes the English bundle so `m.*` resolves against `id`.)
 
 - [ ] **Step 4 — `app.html`**: `<html lang="id">`.
 
