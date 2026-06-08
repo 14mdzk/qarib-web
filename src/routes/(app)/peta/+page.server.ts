@@ -17,6 +17,7 @@
 import type { PageServerLoad } from './$types';
 import { api } from '$core/api';
 import { DEFAULT_CENTER } from '$core/location/index.svelte.js';
+import { DEFAULT_RADIUS_KM } from '$domains/events/store.svelte.js';
 import { toDateRange } from '$lib/shared/utils/date.js';
 
 export const load: PageServerLoad = async ({ fetch }) => {
@@ -29,6 +30,7 @@ export const load: PageServerLoad = async ({ fetch }) => {
 			{
 				lat: DEFAULT_CENTER.lat,
 				lng: DEFAULT_CENTER.lng,
+				radius_km: DEFAULT_RADIUS_KM,
 				date_from,
 				date_to,
 				expand: 'place',

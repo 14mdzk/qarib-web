@@ -16,8 +16,9 @@
 import { createQuery } from '@tanstack/svelte-query';
 import { api } from '$core/api';
 import type { QueryClient } from '@tanstack/svelte-query';
+import type { Paginated } from '$core/api';
 import type { PlaceResponse } from './schema.js';
-import type { GetByIdArgs } from './service.js';
+import type { GetByIdArgs, ListPlacesArgs } from './service.js';
 
 // ---------------------------------------------------------------------------
 // Query key factory
@@ -25,8 +26,44 @@ import type { GetByIdArgs } from './service.js';
 
 export const placeKeys = {
 	all: ['places'] as const,
+	list: (args: ListPlacesArgs) => ['places', 'list', args] as const,
 	get: (id: string, expand?: string) => ['places', 'get', id, expand] as const
 } as const;
+
+// ---------------------------------------------------------------------------
+// Place list query
+// ---------------------------------------------------------------------------
+
+/**
+ * Reactive place-list query.
+ */
+export function definePlaceListQuery(
+	args: ListPlacesArgs,
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: Paginated<PlaceResponse[]>;
+	},
+	queryClient?: QueryClient
+) {
+	return createQuery<Paginated<PlaceResponse[]>>(
+		() => ({
+			queryKey: placeKeys.list(args),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('places.list', args, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<PlaceResponse[]>>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+		}),
+		queryClient ? () => queryClient : undefined
+	);
+}
 
 // ---------------------------------------------------------------------------
 // Single-place query

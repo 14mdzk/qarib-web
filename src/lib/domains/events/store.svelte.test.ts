@@ -8,7 +8,12 @@
  * Conformance: rule .claude/rules/testing.md (factory tested directly).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventsViewService } from './store.svelte.js';
+import {
+	DEFAULT_RADIUS_KM,
+	EventsViewService,
+	MAX_RADIUS_KM,
+	RADIUS_STEPS_KM
+} from './store.svelte.js';
 
 describe('EventsViewService', () => {
 	let svc: EventsViewService;
@@ -19,6 +24,8 @@ describe('EventsViewService', () => {
 
 	it('starts with selectedDate=null, selectedPlaceId=null, sheetMode=peek', () => {
 		expect(svc.selectedDate).toBeNull();
+		expect(svc.selectedRadiusKm).toBe(DEFAULT_RADIUS_KM);
+		expect(svc.selectedSubjectId).toBeNull();
 		expect(svc.selectedPlaceId).toBeNull();
 		expect(svc.sheetMode).toBe('peek');
 	});
@@ -32,6 +39,32 @@ describe('EventsViewService', () => {
 		svc.selectDate('2026-06-10');
 		svc.selectDate(null);
 		expect(svc.selectedDate).toBeNull();
+	});
+
+	it('selectRadius clamps below the default radius and above the max radius', () => {
+		svc.selectRadius(1);
+		expect(svc.selectedRadiusKm).toBe(DEFAULT_RADIUS_KM);
+
+		svc.selectRadius(MAX_RADIUS_KM + 50);
+		expect(svc.selectedRadiusKm).toBe(MAX_RADIUS_KM);
+	});
+
+	it('expandRadius advances through configured radius steps up to max 100 km', () => {
+		for (const step of RADIUS_STEPS_KM.slice(1)) {
+			svc.expandRadius();
+			expect(svc.selectedRadiusKm).toBe(step);
+		}
+
+		svc.expandRadius();
+		expect(svc.selectedRadiusKm).toBe(MAX_RADIUS_KM);
+	});
+
+	it('selectSubject stores and clears the subject filter', () => {
+		svc.selectSubject('subject-tafsir');
+		expect(svc.selectedSubjectId).toBe('subject-tafsir');
+
+		svc.selectSubject(null);
+		expect(svc.selectedSubjectId).toBeNull();
 	});
 
 	it('selectPlace sets selectedPlaceId and resets sheetMode to peek', () => {

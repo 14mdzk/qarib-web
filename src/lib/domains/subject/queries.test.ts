@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { QueryClient } from '@tanstack/svelte-query';
-import { subjectKeys, defineSubjectByIdQuery } from './queries.js';
+import { subjectKeys, defineSubjectByIdQuery, defineSubjectListQuery } from './queries.js';
 
 function buildQc() {
 	return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -41,6 +41,11 @@ describe('subjectKeys', () => {
 	it('get key includes id and expand', () => {
 		const key = subjectKeys.get('uuid-123', 'details');
 		expect(key).toEqual(['subject', 'get', 'uuid-123', 'details']);
+	});
+
+	it('list key includes filters for cache isolation', () => {
+		const key = subjectKeys.list({ limit: 100, is_active: true });
+		expect(key).toEqual(['subject', 'list', { limit: 100, is_active: true }]);
 	});
 
 	it('get key without expand produces an undefined segment', () => {
@@ -94,5 +99,10 @@ describe('defineSubjectByIdQuery options shape', () => {
 		// Smoke-test: calling the factory with a qc must not throw.
 		const qc = buildQc();
 		expect(() => defineSubjectByIdQuery({ id: 'subject-uuid-001' }, {}, qc)).not.toThrow();
+	});
+
+	it('defineSubjectListQuery accepts a queryClient param for page-local use', () => {
+		const qc = buildQc();
+		expect(() => defineSubjectListQuery({ limit: 100, is_active: true }, {}, qc)).not.toThrow();
 	});
 });

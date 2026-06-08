@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { QueryClient } from '@tanstack/svelte-query';
-import { placeKeys, definePlaceByIdQuery } from './queries.js';
+import { placeKeys, definePlaceByIdQuery, definePlaceListQuery } from './queries.js';
 
 function buildQc() {
 	return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -43,6 +43,15 @@ describe('placeKeys', () => {
 	it('get key includes id and expand', () => {
 		const key = placeKeys.get('uuid-123', 'region');
 		expect(key).toEqual(['places', 'get', 'uuid-123', 'region']);
+	});
+
+	it('list key includes nearby filters for cache isolation', () => {
+		const key = placeKeys.list({ near_lat: -6.732, near_lng: 108.5523, radius_km: 25 });
+		expect(key).toEqual([
+			'places',
+			'list',
+			{ near_lat: -6.732, near_lng: 108.5523, radius_km: 25 }
+		]);
 	});
 
 	it('get key without expand produces an undefined segment', () => {
@@ -96,5 +105,12 @@ describe('definePlaceByIdQuery options shape', () => {
 		// Smoke-test: calling the factory with a qc must not throw.
 		const qc = buildQc();
 		expect(() => definePlaceByIdQuery({ id: 'place-uuid-001' }, {}, qc)).not.toThrow();
+	});
+
+	it('definePlaceListQuery accepts a queryClient param for page-local use', () => {
+		const qc = buildQc();
+		expect(() =>
+			definePlaceListQuery({ near_lat: -6.732, near_lng: 108.5523, radius_km: 25 }, {}, qc)
+		).not.toThrow();
 	});
 });

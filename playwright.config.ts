@@ -19,6 +19,7 @@ import { defineConfig } from '@playwright/test';
 
 const STUB_UPSTREAM = 'http://localhost:3099';
 const TEST_SESSION_SECRET = 'test-session-secret-at-least-32-chars-long';
+const TEST_STADIA_API_KEY = process.env.STADIA_API_KEY ?? 'test-stadia-key';
 
 export default defineConfig({
 	testDir: './e2e',
@@ -38,11 +39,13 @@ export default defineConfig({
 		command: [
 			`UPSTREAM_API_URL=${STUB_UPSTREAM}`,
 			`SESSION_SECRET=${TEST_SESSION_SECRET}`,
+			`STADIA_API_KEY=${TEST_STADIA_API_KEY}`,
 			`NODE_ENV=test`,
 			'bun run build',
 			'&&',
 			`UPSTREAM_API_URL=${STUB_UPSTREAM}`,
 			`SESSION_SECRET=${TEST_SESSION_SECRET}`,
+			`STADIA_API_KEY=${TEST_STADIA_API_KEY}`,
 			`NODE_ENV=test`,
 			'bun run preview --port 4173'
 		].join(' '),

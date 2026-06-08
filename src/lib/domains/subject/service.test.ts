@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { ApiError } from '$core/api';
-import { fetchSubjectById } from './service.js';
+import { fetchSubjectById, fetchSubjectList } from './service.js';
 
 function baseOpts() {
 	return { fetch: globalThis.fetch, baseUrl: 'http://localhost' } as const;
@@ -34,6 +34,33 @@ function makeSubject(overrides: Record<string, unknown> = {}) {
 		...overrides
 	};
 }
+
+// ---------------------------------------------------------------------------
+// fetchSubjectList
+// ---------------------------------------------------------------------------
+
+describe('fetchSubjectList', () => {
+	it('returns paginated subjects and forwards list filters', async () => {
+		server.use(
+			http.get('http://localhost/api/upstream/subjects', ({ request }) => {
+				const params = new URL(request.url).searchParams;
+				expect(params.get('limit')).toBe('100');
+				expect(params.get('is_active')).toBe('true');
+				return HttpResponse.json({
+					success: true,
+					data: [makeSubject({ id: 'subject-tafsir', name: { id: 'Tafsir' } })],
+					pagination: { has_more: false, has_prev: false, total: 1 }
+				});
+			})
+		);
+
+		const result = await fetchSubjectList({ limit: 100, is_active: true }, baseOpts());
+
+		expect(result.data).toHaveLength(1);
+		expect(result.data[0]?.id).toBe('subject-tafsir');
+		expect(result.pagination.total).toBe(1);
+	});
+});
 
 // ---------------------------------------------------------------------------
 // fetchSubjectById

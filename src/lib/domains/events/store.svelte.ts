@@ -20,18 +20,41 @@ import { getContext, setContext } from 'svelte';
 
 const KEY = Symbol('eventsView');
 
+export const DEFAULT_RADIUS_KM = 10;
+export const MAX_RADIUS_KM = 100;
+export const RADIUS_STEPS_KM = [10, 25, 50, 100] as const;
+
 // ---------------------------------------------------------------------------
 // Service class
 // ---------------------------------------------------------------------------
 
 export class EventsViewService {
 	selectedDate = $state<string | null>(null);
+	selectedRadiusKm = $state<number>(DEFAULT_RADIUS_KM);
+	selectedSubjectId = $state<string | null>(null);
 	selectedPlaceId = $state<string | null>(null);
 	sheetMode = $state<'peek' | 'full'>('peek');
 
 	/** Select a date strip day (ISO date string). Pass `null` to reset to "today". */
 	selectDate(date: string | null): void {
 		this.selectedDate = date;
+	}
+
+	/** Select a search radius in kilometres. */
+	selectRadius(radiusKm: number): void {
+		const clamped = Math.min(Math.max(radiusKm, DEFAULT_RADIUS_KM), MAX_RADIUS_KM);
+		this.selectedRadiusKm = clamped;
+	}
+
+	/** Move radius to the next configured step, capped at MAX_RADIUS_KM. */
+	expandRadius(): void {
+		const next = RADIUS_STEPS_KM.find((step) => step > this.selectedRadiusKm) ?? MAX_RADIUS_KM;
+		this.selectedRadiusKm = next;
+	}
+
+	/** Select a subject filter. Pass null to show all subjects. */
+	selectSubject(id: string | null): void {
+		this.selectedSubjectId = id;
 	}
 
 	/**

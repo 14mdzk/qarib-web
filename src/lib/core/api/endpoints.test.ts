@@ -26,6 +26,54 @@ describe('Endpoints registry', () => {
 			expect(Endpoints['auth.session'].method).toBe('GET');
 		});
 	});
+
+	describe('places.list', () => {
+		it('builds a list path with location and radius filters', () => {
+			const path = Endpoints['places.list'].path({
+				limit: 20,
+				search: 'al falah',
+				is_active: true,
+				near_lat: -6.732,
+				near_lng: 108.5523,
+				radius_km: 25
+			});
+
+			expect(path).toBe(
+				'/api/upstream/places?limit=20&search=al%20falah&is_active=true&near_lat=-6.732&near_lng=108.5523&radius_km=25'
+			);
+		});
+	});
+
+	describe('events.nearby', () => {
+		it('builds a nearby path with radius, date range, and subject filters', () => {
+			const path = Endpoints['events.nearby'].path({
+				lat: -6.732,
+				lng: 108.5523,
+				radius_km: 100,
+				date_from: '2026-06-08T00:00:00+07:00',
+				date_to: '2026-06-08T23:59:59+07:00',
+				subject_id: 'subject-tafsir',
+				limit: 10,
+				expand: 'place'
+			});
+
+			expect(path).toBe(
+				'/api/upstream/events/nearby?lat=-6.732&lng=108.5523&radius_km=100&subject_id=subject-tafsir&date_from=2026-06-08T00%3A00%3A00%2B07%3A00&date_to=2026-06-08T23%3A59%3A59%2B07%3A00&limit=10&expand=place'
+			);
+		});
+	});
+
+	describe('subject.list', () => {
+		it('builds a list path with active and search filters', () => {
+			const path = Endpoints['subject.list'].path({
+				limit: 100,
+				search: 'tafsir',
+				is_active: true
+			});
+
+			expect(path).toBe('/api/upstream/subjects?limit=100&search=tafsir&is_active=true');
+		});
+	});
 });
 
 describe('defineEndpoint', () => {

@@ -7,7 +7,7 @@
  */
 export type { PlaceResponse } from './schema.js';
 
-export { fetchPlaceById } from './service.js';
-export type { GetByIdArgs } from './service.js';
+export { fetchPlaceList, fetchPlaceById } from './service.js';
+export type { ListPlacesArgs, GetByIdArgs } from './service.js';
 
-export { placeKeys, definePlaceByIdQuery } from './queries.js';
+export { placeKeys, definePlaceListQuery, definePlaceByIdQuery } from './queries.js';

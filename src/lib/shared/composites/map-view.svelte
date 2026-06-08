@@ -30,6 +30,7 @@
 	import { m } from '$core/i18n';
 	import type { PinTier } from '$domains/events/pin-tier.js';
 	import { buildPinIconHtml } from './pin-icon.js';
+	import { Minus, Plus } from '@lucide/svelte';
 
 	interface Pin {
 		id: string | number;
@@ -58,6 +59,16 @@
 	let { center, zoom = 13, pins = [], userLocation, clusters, onpinclick }: Props = $props();
 
 	let mapContainer: HTMLDivElement | undefined = $state();
+	const pinSignature = $derived(
+		pins
+			.map((pin) =>
+				[pin.id, pin.lat, pin.lng, pin.tier, pin.label ?? '', pin.selected ? '1' : '0'].join(':')
+			)
+			.join('|')
+	);
+	const clusterSignature = $derived(
+		(clusters ?? []).map((cluster) => [cluster.lat, cluster.lng, cluster.count].join(':')).join('|')
+	);
 
 	// Internal Leaflet map instance — module-level via closure, not $state,
 	// because Leaflet objects are not plain-serialisable values.
@@ -194,6 +205,14 @@
 		}
 	}
 
+	function zoomIn(): void {
+		map?.zoomIn();
+	}
+
+	function zoomOut(): void {
+		map?.zoomOut();
+	}
+
 	onMount(async () => {
 		// Dynamic import so Leaflet + CSS never run during SSR.
 		const leafletModule = await import('leaflet');
@@ -209,6 +228,7 @@
 		map = L.map(mapContainer, {
 			center,
 			zoom,
+			zoomControl: false,
 			zoomAnimation: !reducedMotion,
 			markerZoomAnimation: !reducedMotion,
 			fadeAnimation: !reducedMotion
@@ -233,15 +253,17 @@
 
 	// Reactively re-render pins when the prop changes.
 	$effect(() => {
+		const trackedPins = pinSignature === '' ? [] : pins;
 		if (map && pinLayerGroup) {
-			renderPins(pins);
+			renderPins(trackedPins);
 		}
 	});
 
 	// Reactively re-render clusters when the prop changes.
 	$effect(() => {
+		const trackedClusters = clusterSignature === '' ? [] : clusters;
 		if (map && clusterLayerGroup) {
-			renderClusters(clusters);
+			renderClusters(trackedClusters);
 		}
 	});
 
@@ -283,3 +305,46 @@
 	aria-label={m.map_view_aria_label()}
 	class="h-full w-full"
 ></div>
+
+<div class="map-zoom-controls" role="toolbar" aria-label={m.map_view_aria_label()}>
+	<button type="button" onclick={zoomIn} aria-label={m.map_zoom_in_label()}>
+		<Plus class="size-5" aria-hidden="true" />
+	</button>
+	<button type="button" onclick={zoomOut} aria-label={m.map_zoom_out_label()}>
+		<Minus class="size-5" aria-hidden="true" />
+	</button>
+</div>
+
+<style>
+	.map-zoom-controls {
+		position: absolute;
+		right: 14px;
+		bottom: calc(var(--map-fab-bottom, 20px) + 52px);
+		z-index: 998;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+
+	.map-zoom-controls button {
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		background: var(--color-paper);
+		border: 1px solid var(--color-line);
+		box-shadow: 0 4px 12px rgba(26, 21, 16, 0.15);
+		display: grid;
+		place-items: center;
+		color: var(--color-ink);
+		cursor: pointer;
+	}
+
+	.map-zoom-controls button:hover {
+		box-shadow: 0 6px 16px rgba(26, 21, 16, 0.2);
+	}
+
+	.map-zoom-controls button:focus-visible {
+		outline: 2px solid var(--color-orange);
+		outline-offset: 2px;
+	}
+</style>
