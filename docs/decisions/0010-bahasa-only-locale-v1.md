@@ -1,6 +1,6 @@
 # 0010 — Bahasa Indonesia as the Sole v1 Locale
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-03
 - **Deciders:** madezin (product owner), lead
 - **Tags:** i18n, scope
@@ -8,7 +8,7 @@
 ## Context
 
 Qarib's audience is Indonesian and **all** of the drafted design copy is Bahasa
-Indonesia. The surfaceit boilerplate ships an English-only catalog but with the
+Indonesia. The source boilerplate shipped an English-only catalog but with the
 full i18n layer (Paraglide) already wired (ADR 0005, 0007): every string flows
 through `$core/i18n`, locale resolves from a cookie, adding a locale is a JSON drop.
 

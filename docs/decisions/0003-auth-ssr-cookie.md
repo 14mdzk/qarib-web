@@ -1,11 +1,15 @@
 # 0003 — SSR-First Auth with HttpOnly Cookie Session
 
-- **Status:** Accepted
+- **Status:** Superseded for Qarib Web v1 by ADR 0009 and ADR 0012
 - **Date:** 2026-05-06
 - **Deciders:** Kaito, Ren, Sora
 - **Tags:** auth, security, ssr
 
 ## Context
+
+> **Current scope note:** this ADR records the reusable cookie-session pattern
+> inherited from the source boilerplate. Qarib Web v1 is public, no-account, and
+> read-only, so this pattern is not active unless a future ADR restores accounts.
 
 The reference backend (hexagonal Go) issues short-lived access tokens and longer-lived refresh tokens. The previous project stored both tokens in `localStorage`. That makes the refresh token an XSS smash-and-grab target and prevents server-side rendering of authenticated pages without a flash of unauthenticated UI.
 

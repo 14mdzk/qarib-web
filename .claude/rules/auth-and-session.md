@@ -1,69 +1,63 @@
 ---
 alwaysApply: true
 description: >
-  ${PROJECT_NAME} authenticates server-side with an HttpOnly session cookie.
-  Tokens never reach the browser. Upstream calls go through a BFF proxy.
+  Superseded for Qarib Web v1 by ADR 0009 and ADR 0012. Qarib Web v1 is
+  public read-only with no account/session surface.
 ---
 
 # Auth and Session Rule
 
+Status: **inactive for Qarib Web v1**. Historical boilerplate guidance below is
+superseded by ADR 0009 (`public-no-auth-web-v1`) and ADR 0012
+(`read-through-bff`).
+
+Qarib Web v1 must not implement login cookies, server sessions, Bearer
+injection, protected layout guards, favorites/follows, logout, CSRF tied to
+account mutation, or mutating BFF routes. The only BFF surface in v1 is the
+same-origin public read-through GET proxy to the qarib-api runtime.
+
+Future account work requires a new accepted ADR before this rule can become
+active again. That ADR must define session storage, cookie attributes, CSRF,
+refresh semantics, guarded route boundaries, and account-specific BFF behavior.
+
 ## Source of truth
 
-- ADR: `docs/decisions/0003-auth-ssr-cookie.md`
-- Obsidian wiki: [[SvelteKit SSR Cookie Session BFF]] (frontend domain)
+- Current v1 ADR: `docs/decisions/0009-public-no-auth-web-v1.md`
+- Current v1 BFF ADR: `docs/decisions/0012-read-through-bff.md`
+- Superseded historical ADR: `docs/decisions/0003-auth-ssr-cookie.md`
 
 ## DO
 
-- **DO** issue an opaque `sid` cookie on login: `HttpOnly`, `SameSite=Lax`, `Secure` in non-dev, path `/`, with a sensible `maxAge`.
-- **DO** store access + refresh tokens **server-side** keyed by `sid` (in-memory map for dev, Redis or similar for production).
-- **DO** resolve the session in `hooks.server.ts` and populate `event.locals.session = { user, role, accessToken, expiresAt }` (or `null`).
-- **DO** route every cross-origin upstream call through a BFF endpoint at `src/routes/api/upstream/[...]/+server.ts` that injects `Authorization: Bearer ...` server-side.
-- **DO** refresh the access token transparently when it is near expiry (`expiresAt - now < 60s`). Use a per-session in-flight promise to coalesce parallel refreshes.
-- **DO** add a `csrf` cookie on login (readable by JS) and require an `x-csrf` header that matches it on unsafe methods (POST/PUT/PATCH/DELETE).
-- **DO** strip browser cookies from outbound upstream requests in the BFF proxy (`headers.delete('cookie')`).
-- **DO** revoke the session on logout (`destroySession(sid)`, best-effort upstream revoke, delete cookies).
+- **DO** keep Qarib Web v1 public and read-only unless a new account ADR supersedes ADR 0009.
+- **DO** route public GET reads through `/api/upstream/[...path]` and never from the browser directly to the qarib-api runtime.
+- **DO** strip browser cookies from outbound public read-through BFF requests.
+- **DO** validate query/path inputs before forwarding public BFF reads.
+- **DO** document any future account proposal in a new ADR before adding account code.
 
 ## DON'T
 
-- **DON'T** put access or refresh tokens in `localStorage`, `sessionStorage`, or any client-readable cookie.
-- **DON'T** return tokens in any response body that the browser can read.
-- **DON'T** call upstream directly from the browser when it requires auth. Go through the BFF.
-- **DON'T** disable SSR (`export const ssr = false`) to "make auth work." That is the symptom of the wrong pattern.
-- **DON'T** redirect authenticated users with a client-side `$effect`. Resolve the session in `+layout.server.ts` and `redirect()` from the loader.
-- **DON'T** trust `event.request.headers.get('cookie')` directly — use `event.cookies` so SvelteKit applies signing/parsing.
+- **DON'T** add `/login`, `/logout`, account guards, favorites/follows, user sessions, or account mutation flows for current v1.
+- **DON'T** add Bearer injection or token refresh to the current public read-through BFF.
+- **DON'T** add session resolution to `hooks.server.ts` for current v1.
+- **DON'T** protect `/peta`, `/kajian/[id]`, `/tempat/[id]`, `/ustadz/[id]`, `/tema/[id]`, or `/cari` behind account state.
 
-## Login flow (canonical)
+## Future Account ADR Sketch
 
-```ts
-// src/routes/(auth)/login/+page.server.ts
-export const actions = {
-  default: async ({ request, cookies, fetch }) => {
-    const data = Object.fromEntries(await request.formData())
-    const upstream = await fetch(env.UPSTREAM + '/auth/login', { /* … */ })
-    const tokens = await upstream.json()
-    const sid = await createSession(tokens)
-    cookies.set('sid', sid, { path: '/', httpOnly: true, sameSite: 'lax', secure: !dev, maxAge: 60 * 60 * 24 * 30 })
-    cookies.set('csrf', crypto.randomUUID(), { path: '/', sameSite: 'lax', secure: !dev })
-    redirect(303, '/')
-  }
-}
-```
+If product scope changes, draft a new ADR before implementation. It should
+answer:
 
-## Protected layout guard
-
-```ts
-// src/routes/(app)/+layout.server.ts
-export const load: ServerLoad = ({ locals }) => {
-  if (!locals.session) redirect(303, '/login')
-  return { user: locals.session.user }
-}
-```
+- Which account features ship first, and why web needs them.
+- Session lifetime, storage backend, cookie attributes, and rotation strategy.
+- CSRF requirements for unsafe methods.
+- Guarded routes and public routes.
+- Token handling between qarib-web and the qarib-api runtime.
+- Migration plan from public read-only v1.
 
 ## Quick reference
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `localStorage.getItem('access_token')` anywhere | Wrong auth model | Move to cookie session + BFF |
-| Blank flash on protected route, then redirect | `ssr=false` + client `$effect` redirect | Resolve session in `hooks.server.ts`; redirect from `+layout.server.ts` |
-| Refresh races causing 401 storms | No coalescing | One in-flight refresh promise per session |
-| CSRF on a state-changing route | Missing `x-csrf` validation | Validate `x-csrf === cookies.get('csrf')` for unsafe methods |
+| Request to add sign-in or saved items | Future account scope leaking into v1 | Write a new ADR; do not code it in v1 |
+| Public page asks for session state | Stale boilerplate pattern | Remove account dependency; keep page public |
+| BFF code injects Authorization | Stale account BFF pattern | Keep v1 BFF as public GET read-through |
+| Route blocks anonymous visitors | Violates ADR 0009 | Remove guard unless a new ADR supersedes v1 |

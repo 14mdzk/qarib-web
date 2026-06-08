@@ -1,5 +1,5 @@
 ## Wiki Knowledge Base
-Path: ~/claude-obsidian/wiki
+Path: ~/Codex-obsidian/wiki
 
 When you need context not already in this project:
 1. Read wiki/hot.md first (recent context cache)

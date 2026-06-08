@@ -1,16 +1,23 @@
 ---
 alwaysApply: true
 description: >
-  Real-time channel discipline for ${PROJECT_NAME}. SSE (and WS later) flow
-  through a BFF, reconnect with bounded backoff, and never own server state.
+  Future real-time channel discipline for Qarib Web. Inactive for public
+  read-only v1.
 ---
 
 # Realtime Rule
 
-## DO
+Status: **inactive for Qarib Web v1**. Current v1 scope is public read-only
+browse over SSR and same-origin public GET reads. Do not add SSE, WebSocket, or
+RealtimeClient code unless a future realtime ADR accepts that scope.
 
+## Future-only DO
+
+- **DO** treat realtime as future-only for current Qarib Web v1.
+- **DO** write or update an ADR before adding SSE/WS channels, cache
+  invalidation, connection ownership, or account-aware realtime behavior.
 - **DO** create the realtime client through a context factory in the layout that owns its lifetime. One client per scope (page or feature), not a global.
-- **DO** route the SSE/WS connection through a BFF endpoint that adds the `Authorization` header server-side. The browser must not see a token.
+- **DO** define future connection auth in that ADR if future channels require account context.
 - **DO** declare channel names as constants in `core/realtime/channels.ts`. Refer to channels by constant, never by string literal.
 - **DO** reconnect with exponential backoff capped (default base 1 s, cap 30 s, max retries 10). After max retries, surface a banner and stop.
 - **DO** deserialize and validate inbound payloads at the boundary. Untrusted JSON deserves a Zod parse before it touches the store.
@@ -19,6 +26,7 @@ description: >
 
 ## DON'T
 
+- **DON'T** add realtime code to current Qarib Web v1 browse flows.
 - **DON'T** open an `EventSource` directly to the upstream URL with a token in the query string. That logs the token in proxies and access logs.
 - **DON'T** store fetched lists or counts in the realtime client. The client parses and dispatches; it does not aggregate.
 - **DON'T** create the client at module scope (`export const sseClient = new SSEClient()`). See `state-management.md`.
@@ -26,6 +34,8 @@ description: >
 - **DON'T** swallow parse errors. Log them and surface a toast in dev; in prod, log to the observability sink.
 
 ## Pattern
+
+Future-only example, not current v1 implementation:
 
 ```ts
 // $core/realtime/index.ts
@@ -66,6 +76,8 @@ The cache stays the single source of truth for server data.
 
 | Need | Where |
 |---|---|
+| Current v1 live updates | Out of scope; use public GET refetch/navigation |
+| Propose realtime | New ADR before code |
 | Add a channel | `core/realtime/channels.ts` constant + per-domain invalidator |
 | Open a connection | factory `createRealtime` called from a layout |
 | React to an event | per-domain invalidator that calls `qc.invalidateQueries` or `qc.setQueryData` |

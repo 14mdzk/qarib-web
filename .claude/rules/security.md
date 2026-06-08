@@ -1,28 +1,26 @@
 ---
 alwaysApply: true
 description: >
-  Security baseline for ${PROJECT_NAME}: tokens stay server-side, headers are
-  strict, input is validated at the boundary, secrets never enter the client
-  bundle.
+  Security baseline for Qarib Web v1: public read-only controls, strict
+  headers, input validation, cache boundaries, and no credential handling.
 ---
 
 # Security Rule
 
 ## DO
 
-- **DO** store access and refresh tokens server-side. The browser holds only an opaque session id (see `auth-and-session.md`).
 - **DO** apply security headers in `hooks.server.ts`:
   - `Content-Security-Policy` (strict; `script-src 'self'`; no `unsafe-inline` outside dev)
   - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` (in production)
   - `Referrer-Policy: strict-origin-when-cross-origin`
   - `X-Content-Type-Options: nosniff`
   - `Permissions-Policy: camera=(), microphone=(), geolocation=()` (open up only what features need)
-- **DO** validate untrusted input at trust boundaries with Zod: form actions, query params, BFF inbound bodies, third-party webhooks.
-- **DO** require `x-csrf` header matching the `csrf` cookie for unsafe HTTP methods (POST/PUT/PATCH/DELETE).
-- **DO** strip `cookie`, `host`, and `origin` from outbound proxy requests in BFF endpoints.
-- **DO** rate-limit auth endpoints in the BFF (`/api/upstream/auth/*`) with a small in-memory or Redis token bucket.
+- **DO** validate untrusted input at trust boundaries with Zod: route params, query params, public BFF request inputs, and any future form actions.
+- **DO** strip `cookie`, `host`, and `origin` from outbound public read-through BFF requests.
+- **DO** keep public BFF routes GET-only for current v1 and return cache headers intentionally (`public`, `private`, or `no-store` by data class).
+- **DO** prevent credential handling in current v1: no account cookies, no token storage, no token forwarding, no auth endpoint proxying.
 - **DO** keep secrets in `.env` (gitignored). Validate them with a Zod schema at startup; fail fast on missing.
-- **DO** mark cookies `Secure` in non-dev. `HttpOnly` for session cookies. `SameSite=Lax` by default; `Strict` for high-risk cookies.
+- **DO** document future account controls in a new ADR before adding server-side sessions, CSRF checks, auth rate limits, or unsafe methods.
 
 ## DON'T
 
@@ -31,7 +29,7 @@ description: >
 - **DON'T** echo unvalidated user input into error messages, redirects, or HTML.
 - **DON'T** disable CSP "to make a third-party widget work." Whitelist explicitly or remove the widget.
 - **DON'T** trust `X-Forwarded-For` without a known reverse-proxy chain. Validate before using for rate-limit / audit.
-- **DON'T** open an `EventSource`/`WebSocket` with a token in the query string from the browser. Use the BFF.
+- **DON'T** add account cookies, CSRF cookies, server-side access/refresh tokens, or auth proxy routes to current v1.
 - **DON'T** introduce a third-party script via `<script src="...">` without a Subresource Integrity (`integrity`) attribute and a CSP allowance.
 
 ## Bundle hygiene
@@ -49,10 +47,9 @@ description: >
 
 | Surface | Threat | Control |
 |---|---|---|
-| Login form | Credential stuffing | Rate-limit + lockout in BFF |
-| BFF proxy | CSRF | Double-submit cookie |
-| BFF proxy | Header injection | Whitelist headers, strip cookie/host/origin |
-| Realtime SSE | Token leak in URL | Connect through BFF, server adds Authorization |
-| Form action | Untrusted body | Zod parse, reject on failure |
+| Public BFF read | Header injection | Whitelist headers, strip cookie/host/origin |
+| Public BFF read | Overbroad caching | Explicit cache policy by data class |
+| Query/search params | Untrusted input | Zod parse, reject or normalize on failure |
+| Future account ADR | Credential stuffing / CSRF / token leak | Define rate limits, CSRF, sessions, and token boundaries before coding |
 | Logger | PII / token in logs | Redact at sink, never log session objects |
 | Static asset | Tampered CDN script | SRI + CSP allowlist |

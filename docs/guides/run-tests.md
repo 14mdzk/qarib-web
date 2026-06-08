@@ -83,8 +83,8 @@ do not stub `fetch` by hand.
 
 ## End-to-end tests — Playwright
 
-Playwright covers user flows: login, list + paginate, mutate, logout, locale
-switch.
+Playwright covers public browse flows: landing, map/list, detail pages,
+navigation between related entities, and search when shipped.
 
 ```sh
 bun run test:e2e                    # headless run (CI mode)
@@ -106,9 +106,9 @@ is load-bearing — see "Why we do not use `bun test`" above.
 // e2e/smoke.e2e.ts
 import { test, expect } from '@playwright/test';
 
-test('home page renders the locale switch', async ({ page }) => {
+test('landing page renders', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByTestId('locale-switch')).toBeVisible();
+	await expect(page.getByRole('link', { name: /buka qarib/i })).toBeVisible();
 });
 ```
 

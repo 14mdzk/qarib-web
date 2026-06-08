@@ -7,11 +7,10 @@ Qarib's public **web app**: a no-account, map-first way to discover **kajian**
 **asatidz** (ustadz), and **tema** (subjects) behind them. It is the first
 surface real users meet. Native mobile comes later.
 
-This repository was forked from the **surfaceit** SvelteKit boilerplate (which
-stays upstream at `14mdzk/surfaceit`). **From this point on, this repo is the
-Qarib product**, not a reusable starting point — the boilerplate's "do not
-become a product" non-goal is intentionally retired here (see ADR 0009-0012).
-`${PROJECT_NAME}` is replaced by `Qarib` throughout.
+This repository was forked from a reusable SvelteKit boilerplate. **From this
+point on, this repo is the Qarib product**, not a reusable starting point. The
+old "do not become a product" non-goal is intentionally retired here (see ADR
+0009-0012).
 
 It consumes **qarib-api** (Go, hexagonal) over **public, read-only** HTTP.
 Content is authored elsewhere — the Laravel/Filament CMS is the single source of
@@ -54,7 +53,7 @@ how we **present** it. This app is that presentation layer.
 - **Content authoring / admin.** That is the CMS (Filament). Qarib-web is read-only.
 - **Native mobile.** Responsive web only. Capacitor/Tauri is a later decision.
 - **Multi-locale.** `id` only for v1; en/ar deferred. (ADR 0010)
-- **Realtime / SSE.** Kajian schedules are not live-tickers; plain SSR + cache.
+- **Realtime channels.** Kajian schedules are not live-tickers; plain SSR + cache.
 - **Write paths of any kind** (attendance, reviews, submissions).
 
 ## Success criteria

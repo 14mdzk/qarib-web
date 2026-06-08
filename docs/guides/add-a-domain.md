@@ -1,16 +1,19 @@
 # Guide — Add a Domain
 
-**Audience:** an engineer adding a bounded slice that mirrors a backend module
-(e.g. `camera`, `billing`, `user`). After this guide you will have a domain
+**Audience:** an engineer adding a bounded public browse slice that mirrors a
+qarib-api runtime module (e.g. `events`, `places`, `asatidz`, `subject`). After
+this guide you will have a domain
 folder that exposes a typed service, query keys, a UI store, and components,
 all importable as `$domains/<name>`.
 
 **Prerequisites:**
 
-- Phase 1 is merged (it is — see `CHANGELOG.md`).
-- Phase 2 core primitives exist. Some sections below depend on `core/api`,
-  `core/query`, and `core/auth` and are flagged as **Phase 2 in progress**.
-  You can scaffold the folder now; the wiring lights up as Phase 2 lands.
+- `core/api`, `core/query`, generated qarib-api runtime types, and the
+  read-through BFF are wired.
+- The browse endpoint exists in `openapi/upstream.yaml` and the endpoint
+  registry.
+- v1 domains are public read-only. Content writes and schema ownership belong
+  to qarib-cms and qarib-api.
 
 **Related rules:**
 
@@ -22,8 +25,8 @@ all importable as `$domains/<name>`.
 
 ## 1. Decide the boundary
 
-A domain is **one bounded context** that maps to one backend module. If you
-are tempted to put two unrelated slices in one folder, stop — make two
+A domain is **one bounded context** that maps to one qarib-api runtime module.
+If you are tempted to put two unrelated slices in one folder, stop — make two
 domains. If two domains would share a type or helper, that piece moves to
 `shared/` or `core/`. Cross-domain imports are forbidden by
 `docs/architecture/layer-rules.md`.
@@ -36,7 +39,7 @@ Pick a kebab-case name. We use `example` below.
 src/lib/domains/example/
 ├── schema.ts            types + zod parsers (often re-exporting from $generated)
 ├── service.ts           the only place api calls happen for this domain
-├── queries.ts           svelte-query keys + defineQuery / defineMutation
+├── queries.ts           svelte-query keys + defineQuery
 ├── store.svelte.ts      UI state factory (context-scoped)
 ├── index.ts             public exports — routes import this, not deep paths
 └── components/
@@ -48,9 +51,9 @@ create the files by hand following this guide.
 
 ## 3. `schema.ts` — types at the boundary
 
-Re-export generated types from `$generated/upstream` (Phase 4 will populate
-this). Add Zod parsers only at trust boundaries — form bodies, URL search
-params, third-party webhooks — per
+Re-export generated types from `$generated/upstream`. Add Zod parsers only at
+trust boundaries — URL search params, BFF inbound params, or third-party
+inputs — per
 [`api-contract.md`](../../.claude/rules/api-contract.md).
 
 ```ts
@@ -72,14 +75,13 @@ export interface Example {
 }
 ```
 
-> **Phase 2 in progress.** Once `$generated/upstream` is wired (ADR 0004),
-> prefer re-exporting `components['schemas']['Example']` over hand-writing the
-> `Example` interface.
+Prefer generated qarib-api runtime types over hand-written interfaces. Write
+local Zod only for inputs this app receives from a browser.
 
 ## 4. `service.ts` — the only api caller for this domain
 
-Every upstream call for `example` lives here. No other file in the domain
-calls `core/api`. Routes call services, not `core/api`.
+Every qarib-api runtime read for `example` lives here. No other file in the
+domain calls `core/api`. Routes call services, not `core/api`.
 
 ```ts
 // src/lib/domains/example/service.ts
@@ -88,28 +90,22 @@ import type { Example, ExampleListQuery } from './schema';
 
 export const exampleService = {
 	list: (q: ExampleListQuery) => api('example.list', q),
-	get: (id: string) => api('example.get', { id }),
-	create: (body: { name: string }) => api('example.create', {}, body),
-	remove: (id: string) => api('example.remove', { id })
+	get: (id: string) => api('example.get', { id })
 } as const;
 ```
 
-> **Phase 2 in progress.** `core/api` and the endpoint registry land in Sora's
-> Phase 2 PR. Until then, the service signature is correct but the `api(...)`
-> call will not compile. Add the endpoint keys (`example.list`, …) to
-> `core/api/endpoints.ts` per
-> [`api-contract.md`](../../.claude/rules/api-contract.md) when wiring.
-
 Do **not** call `fetch(...)` here. Hand-rolled fetch is a code-review block.
+Do **not** add create/update/delete service methods for v1 web browse work;
+qarib-cms owns writes.
 
 ## 5. `queries.ts` — svelte-query bindings
 
 Server state lives in svelte-query, not in the runes store. Define keys and
-query/mutation builders here so components stay declarative.
+query builders here so components stay declarative.
 
 ```ts
 // src/lib/domains/example/queries.ts
-import { defineQuery, defineMutation } from '$core/query';
+import { defineQuery } from '$core/query';
 import { exampleService } from './service';
 import type { ExampleListQuery } from './schema';
 
@@ -125,15 +121,15 @@ export const useExampleList = (q: ExampleListQuery) =>
 		queryFn: () => exampleService.list(q)
 	});
 
-export const useCreateExample = () =>
-	defineMutation({
-		mutationFn: (body: { name: string }) => exampleService.create(body)
+export const useExample = (id: string) =>
+	defineQuery({
+		queryKey: exampleKeys.get(id),
+		queryFn: () => exampleService.get(id)
 	});
 ```
 
-> **Phase 2 in progress.** `defineQuery` / `defineMutation` are part of
-> `core/query` (Yuki's Phase 2 slice). Until merged, the imports will not
-> resolve.
+Use mutations only if a future accepted ADR adds a web write surface. That is
+out of scope for public v1.
 
 ## 6. `store.svelte.ts` — UI state factory
 
@@ -190,7 +186,7 @@ review block.
 // src/lib/domains/example/index.ts
 export * from './schema';
 export { exampleService } from './service';
-export { exampleKeys, useExampleList, useCreateExample } from './queries';
+export { exampleKeys, useExample, useExampleList } from './queries';
 export { createExampleStore, getExampleStore } from './store.svelte';
 export { default as ExampleList } from './components/example-list.svelte';
 ```
@@ -226,7 +222,7 @@ domain's queries and store; they do not call `core/api` or `fetch` directly.
 
 All user-facing strings flow through Paraglide
 ([`i18n.md`](../../.claude/rules/i18n.md)). Add the keys
-(`example_loading`, `example_error`, …) to `messages/en.json`.
+(`example_loading`, `example_error`, ...) to `messages/id.json`.
 
 ## 9. Tests
 
@@ -263,9 +259,11 @@ See [`add-a-route.md`](add-a-route.md) for the route side.
 - [ ] No cross-domain imports (`domains/<X>` does not import `domains/<Y>`).
 - [ ] Store uses `SvelteMap` / `SvelteSet`; no module-singleton.
 - [ ] Service is the only `core/api` caller in the domain.
-- [ ] All user-facing strings live in `messages/en.json`.
+- [ ] Domain exposes public read methods only unless a new ADR adds web writes.
+- [ ] Browser never calls the qarib-api runtime directly.
+- [ ] All user-facing strings live in `messages/id.json`.
 - [ ] Vitest unit covers the store and any pure logic.
-- [ ] If the route is critical (login, list, mutate, logout, locale switch),
-  there is a `*.e2e.ts` spec.
+- [ ] If the route is critical (map, list, detail, search), there is a
+  `*.e2e.ts` spec.
 - [ ] Doc updated — if a new convention emerged, file a concept page in the
   Obsidian wiki and reference it from the relevant rule.

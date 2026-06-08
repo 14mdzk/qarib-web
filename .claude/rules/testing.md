@@ -1,8 +1,8 @@
 ---
 alwaysApply: true
 description: >
-  Testing baseline for ${PROJECT_NAME}: Vitest for units, Playwright for e2e,
-  MSW for HTTP, fake EventSource for SSE. Tests are mandatory, not optional.
+  Testing baseline for Qarib Web: Vitest for units, Playwright for public e2e
+  browse flows, MSW for HTTP. Tests are mandatory, not optional.
 ---
 
 # Testing Rule
@@ -14,8 +14,8 @@ description: >
 - **DO** unit-test pure logic with Vitest (`*.test.ts` co-located).
 - **DO** test domain stores by calling the factory directly with stub deps (see `state-management.md`).
 - **DO** mock HTTP with MSW for component tests. Do not stub `fetch` by hand.
-- **DO** test the realtime path with a fake `EventSource` driver so events can be injected deterministically.
-- **DO** write Playwright e2e specs under `e2e/` for critical flows: login, list+paginate, mutate, logout, locale switch. Filename pattern is `*.e2e.ts` (not `*.spec.ts`) so Bun's built-in test runner does not pick them up — see `## Runner separation` below.
+- **DO** test any future realtime path with a fake `EventSource` driver so events can be injected deterministically, but realtime is not a Qarib Web v1 requirement.
+- **DO** write Playwright e2e specs under `e2e/` for current critical public flows: landing, map/list browse, kajian detail, related-entity navigation (tempat, ustadz, tema), and search when `/cari` ships. Filename pattern is `*.e2e.ts` (not `*.spec.ts`) so Bun's built-in test runner does not pick them up — see `## Runner separation` below.
 - **DO** run `bun run test` (Vitest) and `bun run test:e2e` (Playwright) in CI; both must be green to merge.
 
 ## DON'T
@@ -72,13 +72,12 @@ globalThis.EventSource = FakeEventSource as any
 ### Playwright (e2e)
 
 ```ts
-test('login + list + logout', async ({ page }) => {
-  await page.goto('/login')
-  await page.getByLabel('Email').fill('alice@example.com')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
-  await expect(page.getByRole('heading', { name: 'Cameras' })).toBeVisible()
+test('visitor opens map and kajian detail', async ({ page }) => {
+  await page.goto('/peta')
+  await expect(page.getByRole('heading', { name: /kajian/i })).toBeVisible()
+  await page.getByRole('link', { name: /detail kajian/i }).first().click()
+  await expect(page).toHaveURL(/\/kajian\/[^/]+/)
+  await expect(page.getByRole('heading')).toBeVisible()
 })
 ```
 
