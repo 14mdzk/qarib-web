@@ -5,11 +5,11 @@ Layers exist to keep change blast-radius small. Crossing a layer in the wrong di
 ## The layers (top → bottom)
 
 ```
-routes/                       ← orchestrate, never own logic
-  └── domains/<name>/         ← bounded context: schema + service + queries + ui state
-        └── shared/           ← cross-domain UI + utils
-              └── core/       ← framework primitives, no product knowledge
-                    └── generated/   ← read-only codegen
+routes/                       <- orchestrate, never own logic
+  └── domains/<name>/         <- bounded context: schema + service + queries + ui state
+        └── shared/           <- cross-domain UI + utils
+              └── core/       <- framework primitives, no product knowledge
+                    └── generated/   <- read-only codegen
 ```
 
 A higher layer may import from a lower layer. **A lower layer may never import from a higher one.**
@@ -34,8 +34,19 @@ A higher layer may import from a lower layer. **A lower layer may never import f
 
 ## Client-only enforcement
 
-- `core/realtime` and anything that touches `EventSource`, `WebSocket`, or `localStorage` must not be imported in `*.server.ts` or `+*.server.ts`.
-- These modules guard with `if (typeof window === 'undefined') throw …` in their constructors.
+- Anything that touches browser-only APIs (`window`, `localStorage`,
+  geolocation, map libraries) must not be imported in `*.server.ts` or
+  `+*.server.ts`.
+- Browser code calls the same-origin Qarib Web API layer. It must not call the
+  qarib-api runtime directly.
+
+## Public BFF enforcement
+
+- `src/routes/api/upstream/[...path]/+server.ts` is a public read-through BFF
+  for `GET` reads to the qarib-api runtime.
+- It strips browser-only headers, propagates request id, and owns cache headers.
+- It does not inject Bearer tokens or forward end-user session state in v1.
+- Write paths belong to qarib-cms and qarib-api, not qarib-web.
 
 ## Generated code
 

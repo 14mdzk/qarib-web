@@ -1,6 +1,6 @@
 # 0012 — Read-Through BFF for Public Upstream Reads
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-03
 - **Deciders:** madezin (product owner), lead
 - **Tags:** api, bff, security

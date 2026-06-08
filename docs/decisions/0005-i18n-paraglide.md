@@ -1,6 +1,6 @@
-# 0005 — Paraglide JS for i18n, English-only Catalog Day One
+# 0005 — Paraglide JS for i18n, Bahasa Catalog Day One
 
-- **Status:** Accepted
+- **Status:** Accepted; locale choice updated by ADR 0010
 - **Date:** 2026-05-06
 - **Deciders:** Mei, Yuki
 - **Tags:** i18n, dx
@@ -25,9 +25,9 @@ Cons: pays the full migration tax later — exactly the trap we are climbing out
 
 ## Decision
 
-**Option B**. Paraglide compiles `messages/en.json` (and future locale files) into typed message functions. Every user-facing string in components or routes imports from `$messages` (or whatever Paraglide's compile target alias is). The locale resolver sits in `core/i18n/` and reads a `locale` cookie with `en` default.
+**Option B**. Paraglide compiles `messages/id.json` (and future locale files) into typed message functions. Every user-facing string in components or routes imports from the local i18n facade. The locale resolver sits in `core/i18n/` and defaults to `id`.
 
-Day-one catalog: English only. Adding `id` (or any other) is a matter of dropping `messages/id.json` and translating — no refactor.
+Current Qarib Web v1 catalog: Bahasa Indonesia only. Adding another locale later is a matter of dropping another `messages/<locale>.json` and translating — no refactor, but product locale switching remains out of scope until ADR 0010 is superseded.
 
 ## Consequences
 

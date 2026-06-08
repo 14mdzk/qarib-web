@@ -41,8 +41,8 @@ import { SvelteMap } from 'svelte/reactivity'
 const KEY = Symbol('<service>')
 
 export class Service {
-  user = $state<User | null>(null)
-  cache = new SvelteMap<string, Item>()
+  selectedEventId = $state<string | null>(null)
+  filters = new SvelteMap<string, string>()
   constructor(private deps: ServiceDeps) {}
 }
 
@@ -78,5 +78,5 @@ No module mocking. No `vi.mock`. No global state.
 | Reactive update missing on Map mutation | Vanilla `Map` in `$state` | Switch to `SvelteMap` |
 | `updateCounter++` in a getter | Reactivity hack | Replace collection with `SvelteMap` / `SvelteSet`, delete counter |
 | State shared across SSR requests | Module singleton | Convert to factory + context |
-| `goto('/login')` flash on first paint | Module-singleton auth + `ssr=false` | Convert to context-DI; turn SSR back on; resolve session in `hooks.server.ts` |
+| Public page waits for account state | Future-account pattern leaked into v1 | Remove account dependency; keep v1 browse state local/public |
 | Domain A breaks when Domain B refactors | Cross-domain import | Promote shared piece to `shared/`/`core/` or merge domains |

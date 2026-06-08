@@ -1,6 +1,6 @@
 # 0009 — Public, No-Account Web (v1): Strip the Auth Surface
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-06-03
 - **Deciders:** madezin (product owner), lead
 - **Tags:** auth, scope, bff
@@ -17,7 +17,7 @@ Two facts make accounts unnecessary for v1:
    requirement; only `/auth/*` and `/users*` declare `bearerAuth`. Every
    discovery endpoint (`/events`, `/events/nearby`, `/places`, `/asatidzs`,
    `/subjects`, …) needs no token.
-2. **The surfaceit boilerplate ships a full auth surface** — `(auth)/login`,
+2. **The source boilerplate shipped a full auth surface** — `(auth)/login`,
    `(auth)/logout`, a session-guarded `(app)` layout, cookie-session +
    transparent refresh, CSRF, and a Bearer-injecting BFF (ADR 0003, 0008).
    None of it is reachable by a v1 user flow.
@@ -90,5 +90,5 @@ Revisit if:
 ## Notes
 
 This is a fork-time scope decision: this repo is the Qarib product, not the
-reusable boilerplate (see charter). The boilerplate's auth surface was built for
+reusable boilerplate (see charter). The source auth surface was built for
 backends that require it; Qarib's read surface does not.

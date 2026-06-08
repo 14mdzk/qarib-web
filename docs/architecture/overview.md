@@ -1,94 +1,126 @@
 # Architecture Overview
 
-`${PROJECT_NAME}` is a **server-first SvelteKit application** that consumes a hexagonal-style backend through a typed API client and an SSE/WS realtime channel. Authentication is **session-cookie based** and resolved on the server. Stateful client services are **context-scoped**, never module singletons. Reactive collections use **`svelte/reactivity`**, not vanilla `Map`/`Set` plus reactivity hacks.
+Qarib Web is a **server-first SvelteKit public browse app** for kajian/events.
+v1 is no-account, Bahasa-first, read-only, SSR, and backed by a same-origin
+read-through BFF. The browser calls Qarib Web; Qarib Web calls the
+**qarib-api runtime** through `/api/upstream`.
 
-## Layered model
+Topology:
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ src/routes/                                                            │
-│   (auth)/  (app)/  api/  +error.svelte                                 │
-│   page.server.ts → calls services → renders +page.svelte               │
-└──────────────┬───────────────────────────────────────────┬─────────────┘
-               │                                           │
-               ▼                                           ▼
-┌──────────────────────────┐               ┌──────────────────────────────┐
-│ src/lib/domains/<name>/  │               │ src/lib/server/              │
-│   schema.ts              │               │   session, csrf, headers     │
-│   service.ts             │               │   bff/* upstream proxies     │
-│   queries.ts             │               └──────────────────────────────┘
-│   store.svelte.ts        │
-│   components/            │
-└──────────────┬───────────┘
-               │
-               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│ src/lib/core/                                                        │
-│   api/  auth/  realtime/  query/  config/  logger/  i18n/  result/   │
-└──────────────┬───────────────────────────────────────────┬───────────┘
-               │                                           │
-               ▼                                           ▼
-┌──────────────────────────┐               ┌──────────────────────────────┐
-│ src/lib/shared/          │               │ src/lib/generated/           │
-│   primitives/  composites│               │   openapi → ts (no edits)    │
-│   hooks/  utils/         │               └──────────────────────────────┘
-└──────────────────────────┘
+```text
+qarib-cms writes content/schema -> qarib-api runtime serves public reads -> qarib-web presents -> native mobile later
 ```
 
-## Data flow (request → render)
+`qarib-cms` owns authoring, mutations, and schema stewardship. Qarib Web owns
+presentation, route-level orchestration, cache/tracing headers, and client-safe
+public discovery. Native mobile consumes the same product domain later; it is
+not part of web v1.
 
-1. Browser hits a protected route under `(app)`.
-2. `hooks.server.ts` resolves the session from the cookie (`sid`), populates `event.locals.session`, refreshes the upstream access token if expired, sets a request id on `event.locals.reqId`, and applies CSP / security headers.
-3. The route's `+page.server.ts` `load` calls a domain service, which calls the typed `core/api` client. The api client targets either a BFF endpoint (`/api/...`) or the upstream directly when in the same trust domain.
-4. Server-rendered HTML is sent. The page hydrates with the same data; svelte-query promotes the server fetch into its cache so the client does not re-fetch immediately.
-5. The page may open an SSE connection through `core/realtime`. The connection routes through a BFF endpoint that injects the bearer; the browser never sees a token.
+## Layered Model
 
-## Trust boundaries
+```text
+src/routes/
+  (marketing)/        landing page
+  (app)/              public browse routes
+  api/upstream/       public GET BFF to qarib-api runtime
+  api/tiles/          map tile proxy
+      |
+      v
+src/lib/domains/<name>/
+  schema.ts           generated types + Zod at trust boundaries
+  service.ts          only domain caller of core/api
+  queries.ts          svelte-query keys and bindings
+  store.svelte.ts     UI-only state, context-scoped
+  components/
+      |
+      v
+src/lib/core/
+  api/                endpoint registry, core-fetch, ApiError
+  query/              svelte-query setup
+  config/             env validation
+  logger/             server/client logging facade
+  i18n/               Paraglide facade, default id
+  location/           user location state helpers
+      |
+      v
+src/lib/generated/    openapi-typescript output from openapi/upstream.yaml
+```
 
-| Boundary | Crosses | What is allowed |
+## Data Flow
+
+1. Visitor opens a public route such as `/peta`, `/kajian/[id]`,
+   `/tempat/[id]`, `/ustadz/[id]`, or `/tema/[id]`.
+2. `hooks.server.ts` mints request context, runs i18n, applies security/CSP
+   headers, and logs errors. It does not resolve end-user sessions in v1.
+3. The route's `+page.server.ts` parses URL/search params, then calls a domain
+   service.
+4. The domain service calls the typed `core/api` client.
+5. `core/api` targets same-origin `/api/upstream`, whose BFF forwards public
+   `GET` reads to the qarib-api runtime, strips browser-only headers, propagates
+   `x-request-id`, and applies cache headers.
+6. Server-rendered HTML is returned in Bahasa. Hydration reuses the same data;
+   svelte-query owns subsequent server-state caching.
+
+The browser never receives qarib-api runtime URLs, private env, tokens, or
+server credentials. It also never calls the qarib-api runtime directly.
+
+## Trust Boundaries
+
+| Boundary | Crosses | Allowed in v1 |
 |---|---|---|
-| Browser → SvelteKit server | HTTP / SSE | Cookies (`sid`, `csrf`), public env, no upstream tokens |
-| SvelteKit server → upstream | HTTP / SSE | Bearer token (server-held), tenant headers |
-| Server-only modules | `*.server.ts`, `src/lib/server/**` | May read private env, secrets, sign cookies |
-| Client modules | everywhere else | May read **only** `PUBLIC_*` env |
+| Browser -> SvelteKit route | HTTP | Public routes, public cookies/env only, no end-user auth state |
+| Browser -> `/api/upstream` | HTTP GET | Same-origin public read requests |
+| SvelteKit BFF -> qarib-api runtime | HTTP GET | Public read calls, request id, curated headers, cache policy |
+| SvelteKit -> tile provider | HTTP GET | Tile proxy requests with server-held provider config |
+| Server-only modules | `*.server.ts`, `src/lib/server/**` | Private env, proxy helpers, response header control |
+| Client modules | everywhere else | `PUBLIC_*` env and hydrated page data only |
 
-## Real-time
+## Route Model
 
-- One SSE client per *page* (or per *feature*) instantiated from a context factory in a layout.
-- Channels are named constants. Consumers subscribe via handler maps merged into the client.
-- Reactive state lives in domain stores, not in the SSE client. The client's only job is parse + dispatch.
-- Reconnect with exponential backoff capped at 30 s; circuit opens after N failures and surfaces a banner.
+- `src/routes/(marketing)/` owns `/`, the public landing page.
+- `src/routes/(app)/` owns public browse pages. There is no v1 login flow and
+  no end-user session gate around this group.
+- `src/routes/api/upstream/[...path]/+server.ts` owns the qarib-api runtime
+  read-through BFF.
+- `src/routes/api/tiles/[...tile]/+server.ts` owns map tile proxying.
 
 ## State
 
-- **Server state** (data fetched from the API): owned by svelte-query in `core/query`. Cache key derived from the endpoint registry.
-- **UI state** (filters, modals, selection): owned by domain stores via context factories.
-- **Session state** (user, role, locale): owned by `core/auth`, hydrated server-side, exposed via context.
-- **Module-singleton state is forbidden** for anything stateful. Pure constants and functions are fine.
+- **Server state**: data fetched from qarib-api runtime, owned by svelte-query
+  via `core/query`.
+- **UI state**: filters, selected pins, sheets, and location preference, owned
+  by context-scoped domain stores.
+- **Locale state**: Bahasa-only v1 (`id`) via Paraglide and root layout data.
+- **No v1 session state**: no login, signup, favorites, follows, or per-user
+  authorization branch exists in the current architecture.
+- **Module-singleton state is forbidden** for anything stateful. Pure constants
+  and functions are fine.
 
 ## Errors
 
-- All HTTP errors funnel through `ApiError` from `core/api/error.ts`.
-- The api client classifies: network, auth, validation, conflict, server. The classifier feeds error toasts and svelte-query retry decisions.
-- `+error.svelte` renders shell-level failures. `handleError` hook in both `hooks.server.ts` and `hooks.client.ts` ships errors to the logger.
-
-## Realtime + Query interaction
-
-- SSE events do not write to svelte-query directly. They publish to a domain *invalidator* that calls `queryClient.invalidateQueries(...)` or surgically updates the cache via `setQueryData`. This keeps the cache as the single source of truth for server data.
+- All API errors funnel through `ApiError` from `core/api/error.ts`.
+- Route loaders convert missing/invalid product data into SvelteKit errors at
+  the route boundary.
+- `+error.svelte` renders global failures with request context where available.
+- `handleError` in hooks logs structured errors through the logger.
 
 ## i18n
 
-- All user-facing strings live in `messages/` (Paraglide). Components import compiled message functions, never literals.
-- Locale comes from cookie (`locale`), defaulting to `en`. Switching emits a server-side response that updates the cookie and reloads.
+- All user-facing strings live in `messages/id.json` and flow through
+  `$core/i18n`.
+- `id` is the only shipped locale in v1. English/Arabic localization is later;
+  Arabic may appear as decorative brand/script content only.
 
-## Forbidden patterns
+## Forbidden Patterns
 
-(See the **frontend** domain of the Obsidian wiki for the long-form rationale: [[Module Singleton Store Anti-Pattern]], [[Svelte 5 Reactive Collection Pitfall]], [[SvelteKit SSR Cookie Session BFF]], [[Endpoint Registry Pattern]].)
-
+- Browser-direct calls to the qarib-api runtime.
+- Login, session guard, Bearer injection, refresh-token, or CSRF flows in v1
+  public browse work.
+- Mutating `/api/upstream` routes; qarib-web is public read-only.
 - Module-singleton stateful stores.
-- `localStorage`-stored refresh tokens.
-- `ssr = false` on protected routes.
-- Hand-rolled `fetch` outside `core/api`.
-- Vanilla `Map`/`Set` with `updateCounter` reactivity hacks. Use `SvelteMap` / `SvelteSet`.
-- Backend-shape leakage in URL builders ("backend splits on commas").
+- Hand-rolled `fetch` outside `core/api` for product reads and outside server
+  proxy helpers for BFF/tile routing.
+- Vanilla `Map`/`Set` with `updateCounter` reactivity hacks. Use `SvelteMap` /
+  `SvelteSet`.
+- Backend-shape leakage in URL builders.
 - Inline user-facing strings.

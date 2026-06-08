@@ -24,6 +24,7 @@
 	import type { InfiniteData } from '@tanstack/svelte-query';
 	import type { PageData } from './$types';
 	import { GlobeOff, Map } from '@lucide/svelte';
+	import { l10n } from '$shared/utils/l10n';
 
 	let { data }: { data: PageData } = $props();
 
@@ -136,12 +137,6 @@
 	// ---------------------------------------------------------------------------
 	// Pin sheet data — built from the selected place's occurrences
 	// ---------------------------------------------------------------------------
-
-	function localise(l10n: Record<string, string> | null | undefined): string {
-		if (!l10n) return '';
-		return l10n['id'] ?? Object.values(l10n)[0] ?? '';
-	}
-
 	const selectedPlaceOccurrences = $derived(
 		eventsView.selectedPlaceId != null
 			? (events as EventRecurringResponseWithPlace[]).filter(
@@ -159,7 +154,7 @@
 							? selectedPlaceOccurrences[0].distance_km
 							: null;
 					return {
-						name: localise(place.name),
+						name: l10n(place.name),
 						distanceLabel: distKm != null ? formatDistance(distKm) : '',
 						address: place.address ?? undefined
 					};
@@ -172,7 +167,7 @@
 			.filter((e) => e.date_start != null)
 			.map((e) => ({
 				id: e.id,
-				title: localise(e.name),
+				title: l10n(e.name),
 				timeLabel: formatTime(e.date_start),
 				ustadzName: '',
 				tier: deriveTier(e.date_start),

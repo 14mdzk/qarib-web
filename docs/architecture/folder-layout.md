@@ -1,66 +1,66 @@
 # Folder Layout
 
-This file is the canonical map. If a layout change is proposed, update this file in the same PR.
+This file is the canonical map. If a layout change is proposed, update this
+file in the same PR.
 
-```
-${PROJECT_NAME}/
-├── CLAUDE.md                       project entry for any agent
-├── docs/                           archive (charter, roadmap, architecture, decisions, wiki, guides)
+```text
+qarib-web/
+├── CLAUDE.md                       project entry for agents
+├── README.md                       contributor quickstart
+├── docs/                           charter, roadmap, architecture, ADRs, guides, plans
 ├── .claude/
 │   ├── CLAUDE.md                   wiki pointer
-│   ├── agents/                     personas + specialists
+│   ├── agents/                     mirrored personas + specialists, when present
 │   ├── rules/                      always-applied behavioral rules
-│   └── settings.local.json
-├── messages/                       Paraglide JS message catalogs (en.json, …)
-├── openapi/                        upstream OpenAPI spec snapshot (Phase 4+)
-├── scripts/                        codegen, scaffolding, release helpers
-├── static/                         publicly served assets
+│   └── settings.json
+├── messages/
+│   └── id.json                     Bahasa Indonesia Paraglide catalog
+├── openapi/
+│   └── upstream.yaml               qarib-api runtime OpenAPI snapshot
 ├── src/
 │   ├── app.d.ts                    App.Locals, App.PageData, App.Error
 │   ├── app.html                    shell HTML
-│   ├── hooks.server.ts             auth, session, CSP, reqID, handleError
-│   ├── hooks.client.ts             client error reporter, locale init
+│   ├── hooks.server.ts             request id, i18n, security headers, handleError
+│   ├── hooks.client.ts             client error reporter
 │   ├── lib/
 │   │   ├── core/                   framework primitives, no domain logic
 │   │   │   ├── api/                endpoint registry, core-fetch, error, envelope
-│   │   │   ├── auth/               session context, role helpers
-│   │   │   ├── realtime/           SSE/WS client, channel constants, reconnect
-│   │   │   ├── query/              svelte-query setup + defineQuery/Mutation
-│   │   │   ├── config/             zod-validated env loader (public/private split)
+│   │   │   ├── config/             zod-validated env loader
+│   │   │   ├── i18n/               Paraglide facade
+│   │   │   ├── location/           location preference helpers
 │   │   │   ├── logger/             pino + client wrapper
-│   │   │   ├── i18n/               Paraglide setup, locale resolver
-│   │   │   ├── result/             Result<T,E>, ApiError
-│   │   │   └── types/              cross-cutting brand types
+│   │   │   ├── query/              svelte-query setup + defineQuery/Mutation
+│   │   │   ├── realtime/           historical/reusable client code; not a v1 product flow
+│   │   │   └── result/             Result<T,E>, ApiError
 │   │   ├── shared/                 cross-domain UI + utils
-│   │   │   ├── primitives/         shadcn-svelte forked components (Button, Input, …)
-│   │   │   ├── composites/         paginator, data-table, filter-bar, empty/error states
-│   │   │   ├── hooks/              is-mobile, click-outside, etc.
-│   │   │   └── utils/              cn, date, debounce, parseSearchParams
-│   │   ├── domains/                bounded contexts mirroring backend modules
-│   │   │   └── _template/          copy-pasteable starter
-│   │   │       ├── schema.ts       zod (often re-export from generated)
-│   │   │       ├── service.ts      typed service (apiGet/Post/...)
-│   │   │       ├── queries.ts      svelte-query keys + defineQuery/Mutation
-│   │   │       ├── store.svelte.ts context factory for UI state
-│   │   │       └── components/
-│   │   ├── server/                 server-only modules (never bundled to client)
-│   │   │   ├── session.ts          cookie session reader/writer
-│   │   │   ├── headers.ts          CSP, HSTS, etc.
-│   │   │   └── bff/                upstream proxies (cookie → bearer)
+│   │   ├── domains/                public browse slices mirroring qarib-api modules
+│   │   │   ├── events/             kajian/event occurrence browse
+│   │   │   ├── places/             venue browse/detail
+│   │   │   ├── asatidz/            ustadz browse/detail
+│   │   │   └── subject/            tema browse/detail
+│   │   ├── server/                 server-only modules, never bundled to client
+│   │   │   ├── bff-proxy.ts        public GET proxy to qarib-api runtime
+│   │   │   └── tile-proxy.ts       map tile proxy
 │   │   └── generated/              openapi-typescript output, do not edit
 │   └── routes/
-│       ├── +layout.svelte          theme/Toaster bootstrap
-│       ├── +layout.server.ts       session, locale, role hydration
+│       ├── +layout.server.ts       root data, locale/request context
+│       ├── +layout.svelte          app bootstrap
 │       ├── +error.svelte           global error boundary
-│       ├── (auth)/                 public auth pages (login, reset, …)
-│       │   └── login/+page.{svelte,server.ts}
-│       ├── (app)/                  protected app shell
-│       │   ├── +layout.server.ts   guard: redirect if no session
-│       │   ├── +layout.svelte      sidebar/header shell
-│       │   └── …features
-│       └── api/                    BFF endpoints
-│           └── upstream/[...]/     proxy with bearer injection
-├── tests/                          e2e Playwright specs
+│       ├── (marketing)/            landing route group
+│       │   ├── +layout.svelte
+│       │   └── +page.svelte
+│       ├── (app)/                  public, unguarded browse routes
+│       │   ├── +layout.svelte      browse app shell
+│       │   ├── +error.svelte
+│       │   ├── peta/
+│       │   ├── kajian/[id]/
+│       │   ├── tempat/[id]/
+│       │   ├── ustadz/[id]/
+│       │   └── tema/[id]/
+│       └── api/
+│           ├── upstream/[...path]/ public read-through BFF for qarib-api runtime
+│           └── tiles/[...tile]/    map tile proxy
+├── tests/                          Playwright specs, when present
 ├── eslint.config.js
 ├── prettier config
 ├── lefthook.yml
@@ -87,19 +87,33 @@ Configured in `svelte.config.js`:
 | `$routes` | `src/routes` |
 | `$messages` | `messages` |
 
-`$server` and `$generated` are import-allowlisted — see `architecture/layer-rules.md`.
+`$server` and `$generated` are import-allowlisted. See
+[`layer-rules.md`](layer-rules.md).
 
-## File naming
+## File Naming
 
 - Svelte components: `kebab-case.svelte`
 - TS modules: `kebab-case.ts`
-- Files containing runes: must end in `.svelte.ts` or live inside a `.svelte` component.
-- Server-only TS: must end in `.server.ts` **or** live under `src/lib/server/**`.
-- Tests: co-located `*.test.ts` for units (Vitest); `e2e/**.e2e.ts` for Playwright. The `.e2e.ts` extension keeps Bun's built-in `bun test` runner from grabbing Playwright specs (it globs `*.{test,spec}.{ts,tsx,js,jsx}` and has no exclude config).
+- Files containing runes: must end in `.svelte.ts` or live inside a `.svelte`
+  component.
+- Server-only TS: must end in `.server.ts` or live under `src/lib/server/**`.
+- Tests: co-located `*.test.ts` for units (Vitest); `e2e/**.e2e.ts` for
+  Playwright. The `.e2e.ts` extension keeps Bun's built-in runner from grabbing
+  Playwright specs.
+
+## Current Route Rules
+
+- Public browse pages go under `src/routes/(app)/`.
+- Landing/marketing pages go under `src/routes/(marketing)/`.
+- Same-origin BFF endpoints go under `src/routes/api/`.
+- Do not add a v1 `(auth)` route group or `(app)` session guard without a new
+  ADR that supersedes ADR 0009.
 
 ## Forbidden
 
 - `src/lib/utils.ts` mega-file. Split per concern under `src/lib/shared/utils/`.
-- Components living outside `shared/primitives`, `shared/composites`, or a domain folder.
+- Components living outside `shared/primitives`, `shared/composites`, or a
+  domain folder.
 - Stores under `src/lib/stores/`. Stores live with their domain.
+- Browser-direct qarib-api runtime calls.
 - "miscellaneous" or "common" folders. Name what is in it.

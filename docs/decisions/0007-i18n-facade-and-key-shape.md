@@ -17,7 +17,7 @@ contradiction between two surfaces that should agree:
 - `.claude/rules/i18n.md` (the rule prose) says imports come from a
   `$messages` alias and keys are dotted, e.g. `m['auth.login.title']()`.
 - The shipped code (`src/lib/core/i18n/index.ts`,
-  `src/routes/+layout.svelte`, `messages/en.json`) imports a named `m`
+  `src/routes/+layout.svelte`, `messages/id.json`) imports a named `m`
   from `$core/i18n` and uses flat snake_case keys, e.g. `m.app_title()`.
 
 The rule was written speculatively against the original Paraglide brief

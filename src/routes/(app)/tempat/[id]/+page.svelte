@@ -8,6 +8,7 @@
 	import { defineSeriesListQuery } from '$domains/events/queries.js';
 	import type { PinTier } from '$domains/events/pin-tier.js';
 	import type { PageData } from './$types';
+	import { l10n } from '$shared/utils/l10n';
 
 	let { data }: { data: PageData } = $props();
 
@@ -51,12 +52,6 @@
 	const kajianList = $derived(kajianQuery.data?.data ?? []);
 	const isLoading = $derived(placeQuery.isPending);
 	const isError = $derived(placeQuery.isError);
-
-	/** Localise an L10nString (id first, then first available). */
-	function l10n(map: Record<string, string> | null | undefined): string {
-		if (!map) return '';
-		return map['id'] ?? Object.values(map)[0] ?? '';
-	}
 
 	/**
 	 * Region chip text.

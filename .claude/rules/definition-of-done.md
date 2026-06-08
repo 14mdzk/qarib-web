@@ -13,7 +13,7 @@ description: >
 - [ ] Layer rules respected (`architecture.md`).
 - [ ] No new module-singleton stateful stores (`state-management.md`).
 - [ ] No new hand-rolled `fetch` (`api-contract.md`).
-- [ ] No tokens reaching the browser (`auth-and-session.md`, `security.md`).
+- [ ] No account/session/token behavior added to current public v1 (`auth-and-session.md`, `security.md`).
 - [ ] No vanilla `Map`/`Set` in `$state` for reactive collections.
 - [ ] No `any`, `as any`, or non-null `!` without an inline rationale.
 - [ ] No `// eslint-disable-...` without a one-line reason.
@@ -25,7 +25,7 @@ description: >
 ## Tests
 
 - [ ] Unit tests cover the change, including at least one negative path.
-- [ ] e2e covers the change if it touches a critical user flow (login, list, mutate, logout, locale switch).
+- [ ] e2e covers the change if it touches a critical public v1 flow: landing, map/list browse, kajian detail, related-entity navigation (tempat, ustadz, tema), and search when shipped.
 - [ ] All gates green: typecheck, lint, unit, e2e, codegen check, build.
 
 ## Docs
