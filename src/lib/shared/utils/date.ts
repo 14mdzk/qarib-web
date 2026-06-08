@@ -23,6 +23,28 @@ export function formatDistance(km: number): string {
 	return `${km.toFixed(1)} km`;
 }
 
+export function toLocalIsoDate(date: Date): string {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+}
+
+export function shiftCalendarMonth(date: Date, delta: number): Date {
+	const next = new Date(date);
+	next.setDate(1);
+	next.setMonth(next.getMonth() + delta);
+	return next;
+}
+
+export function getWeekdayLabels(locale = 'id-ID'): string[] {
+	return Array.from({ length: 7 }, (_, index) =>
+		new Intl.DateTimeFormat(locale, { weekday: 'short' })
+			.format(new Date(2026, 0, 4 + index, 12))
+			.replace(/\.$/, '')
+	);
+}
+
 export function toDateRange(dateStr: string): { date_from: string; date_to: string } {
 	const date = new Date(dateStr + 'T00:00:00');
 	const offset = -date.getTimezoneOffset();

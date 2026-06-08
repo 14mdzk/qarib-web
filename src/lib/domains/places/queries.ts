@@ -38,9 +38,9 @@ export const placeKeys = {
  * Reactive place-list query.
  */
 export function definePlaceListQuery(
-	args: ListPlacesArgs,
+	args: ListPlacesArgs | (() => ListPlacesArgs),
 	opts?: {
-		enabled?: boolean;
+		enabled?: boolean | (() => boolean);
 		staleTime?: number;
 		requestId?: string;
 		initialData?: Paginated<PlaceResponse[]>;
@@ -49,14 +49,14 @@ export function definePlaceListQuery(
 ) {
 	return createQuery<Paginated<PlaceResponse[]>>(
 		() => ({
-			queryKey: placeKeys.list(args),
+			queryKey: placeKeys.list(typeof args === 'function' ? args() : args),
 			queryFn: ({ signal }: { signal: AbortSignal }) =>
-				api('places.list', args, undefined, {
+				api('places.list', typeof args === 'function' ? args() : args, undefined, {
 					signal,
 					requestId: opts?.requestId,
 					baseUrl: ''
 				}) as Promise<Paginated<PlaceResponse[]>>,
-			enabled: opts?.enabled,
+			enabled: typeof opts?.enabled === 'function' ? opts.enabled() : opts?.enabled,
 			staleTime: opts?.staleTime,
 			initialData: opts?.initialData,
 			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined

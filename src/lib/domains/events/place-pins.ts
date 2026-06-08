@@ -36,6 +36,20 @@ export interface MapPlacePin {
 	label: string;
 }
 
+export interface FuturePlaceSuggestion {
+	id: string;
+	name: string;
+	address: string;
+	count: number;
+	nextLabel: string;
+}
+
+interface NearbyPlaceCoordinates {
+	id?: string | null;
+	lat?: number | null;
+	lng?: number | null;
+}
+
 /** Caller-supplied i18n labels for the two special pin tiers. */
 export interface PinLabels {
 	/** Displayed on now-tier pins (e.g. m.pin_label_now()). */
@@ -61,6 +75,12 @@ function tierLabel(tier: PinTier, dateStart: string, labels: PinLabels): string 
 	if (tier === 'now') return labels.now;
 	if (tier === 'later') return labels.later;
 	return formatTime(dateStart);
+}
+
+function localizedName(value: Record<string, string> | string | null | undefined): string {
+	if (!value) return '';
+	if (typeof value === 'string') return value;
+	return value.id ?? Object.values(value)[0] ?? '';
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +158,101 @@ export function groupOccurrencesToPlacePins(
 			lng,
 			tier,
 			label: tierLabel(tier, representative.dateStart, labels)
+		});
+	}
+
+	return pins;
+}
+
+/**
+ * Group future fallback occurrences by place and count unique event series.
+ *
+ * `events.nearby` returns occurrences. A weekly kajian can therefore appear
+ * multiple times in a future range; UI copy should say "1 kajian", not "4
+ * kajian", when those rows belong to the same series.
+ */
+export function groupFuturePlaces(
+	items: EventRecurringResponseWithPlace[],
+	formatDate: (isoDate: string) => string
+): FuturePlaceSuggestion[] {
+	const byPlace = new Map<
+		string,
+		{
+			name: string;
+			address: string;
+			dates: string[];
+			seriesIds: Set<string>;
+		}
+	>();
+
+	for (const event of items) {
+		if (!event.place?.id || !event.date_start) continue;
+		const existing = byPlace.get(event.place.id);
+		const seriesId =
+			typeof event.event_id === 'string' && event.event_id.trim() !== ''
+				? event.event_id
+				: String(event.id);
+		if (existing) {
+			existing.dates.push(event.date_start);
+			existing.seriesIds.add(seriesId);
+			continue;
+		}
+		byPlace.set(event.place.id, {
+			name: localizedName(event.place.name),
+			address: event.place.address ?? '',
+			dates: [event.date_start],
+			seriesIds: new Set([seriesId])
+		});
+	}
+
+	return [...byPlace.entries()]
+		.map(([id, place]) => {
+			const sortedDates = place.dates.toSorted(
+				(a, b) => new Date(a).getTime() - new Date(b).getTime()
+			);
+			return {
+				id,
+				name: place.name,
+				address: place.address,
+				count: place.seriesIds.size,
+				nextLabel: sortedDates[0] ? formatDate(sortedDates[0].slice(0, 10)) : ''
+			};
+		})
+		.slice(0, 4);
+}
+
+/**
+ * Add nearby places without today occurrences as muted map pins.
+ *
+ * Event pins win when a place has today's event data. Place-only pins let users
+ * discover mosques without implying that an upcoming event has been proven.
+ */
+export function mergeNearbyPlacesWithEventPins(
+	eventPins: MapPlacePin[],
+	places: NearbyPlaceCoordinates[],
+	placeLabel: string
+): MapPlacePin[] {
+	const pins = [...eventPins];
+	const pinnedPlaceIds = new Set(eventPins.map((pin) => pin.id));
+
+	for (const place of places) {
+		if (!place.id || pinnedPlaceIds.has(place.id)) continue;
+		const lat = place.lat;
+		const lng = place.lng;
+		if (
+			typeof lat !== 'number' ||
+			typeof lng !== 'number' ||
+			Number.isNaN(lat) ||
+			Number.isNaN(lng)
+		) {
+			continue;
+		}
+		pins.push({
+			id: place.id,
+			lat,
+			lng,
+			tier: 'later',
+			label: placeLabel
 		});
 	}
 

@@ -4,7 +4,10 @@ import {
 	formatTime,
 	formatDistance,
 	toDateRange,
-	getRelativeDateLabel
+	getRelativeDateLabel,
+	toLocalIsoDate,
+	shiftCalendarMonth,
+	getWeekdayLabels
 } from './date.js';
 
 describe('formatDistance', () => {
@@ -55,6 +58,26 @@ describe('toDateRange', () => {
 		const { date_from, date_to } = toDateRange('2026-05-15');
 		expect(date_from.startsWith('2026-05-15')).toBe(true);
 		expect(date_to.startsWith('2026-05-15')).toBe(true);
+	});
+});
+
+describe('toLocalIsoDate', () => {
+	it('preserves the visible local calendar day instead of converting through UTC', () => {
+		const localJuneFirst = new Date(2026, 5, 1, 0, 30);
+		expect(toLocalIsoDate(localJuneFirst)).toBe('2026-06-01');
+	});
+});
+
+describe('shiftCalendarMonth', () => {
+	it('normalizes to day one before moving from January 31 to February', () => {
+		const result = shiftCalendarMonth(new Date(2026, 0, 31, 12), 1);
+		expect(toLocalIsoDate(result)).toBe('2026-02-01');
+	});
+});
+
+describe('getWeekdayLabels', () => {
+	it('derives seven localized weekday labels starting on Sunday', () => {
+		expect(getWeekdayLabels('id-ID')).toEqual(['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']);
 	});
 });
 
