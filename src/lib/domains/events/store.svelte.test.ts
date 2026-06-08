@@ -49,7 +49,12 @@ describe('EventsViewService', () => {
 		expect(svc.selectedRadiusKm).toBe(MAX_RADIUS_KM);
 	});
 
-	it('expandRadius advances through configured radius steps up to max 100 km', () => {
+	it('uses progressive radius steps capped at 60 km', () => {
+		expect(RADIUS_STEPS_KM).toEqual([10, 15, 25, 40, 60]);
+		expect(MAX_RADIUS_KM).toBe(60);
+	});
+
+	it('expandRadius advances through configured radius steps up to max 60 km', () => {
 		for (const step of RADIUS_STEPS_KM.slice(1)) {
 			svc.expandRadius();
 			expect(svc.selectedRadiusKm).toBe(step);

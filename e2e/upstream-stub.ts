@@ -127,7 +127,7 @@ function futureFallbackOccurrences() {
 		}),
 		occurrence({
 			id: 2002,
-			event_id: 'uuid-future-b',
+			event_id: 'uuid-future-a',
 			name: { id: 'Kajian Fiqih Pekanan' },
 			date_start: nextWeek,
 			distance_km: 18,
@@ -247,6 +247,47 @@ prefixRoutes.push({
 	}
 });
 
+// GET /places?… (prefix match — peta place-only pins)
+prefixRoutes.push({
+	method: 'GET',
+	prefix: '/places',
+	handler: (_req, res) => {
+		json(
+			res,
+			200,
+			paginated([
+				{
+					id: 'place-uuid-1',
+					slug: 'masjid-al-falah',
+					name: { id: 'Masjid Al-Falah' },
+					address: 'Jl. Contoh No. 1, Cirebon',
+					lat: -6.732,
+					lng: 108.5523,
+					is_active: true
+				},
+				{
+					id: 'place-uuid-2',
+					slug: 'masjid-jami-cirebon',
+					name: { id: "Masjid Jami' Cirebon" },
+					address: "Jl. Jami' No. 5, Cirebon",
+					lat: -6.74,
+					lng: 108.561,
+					is_active: true
+				},
+				{
+					id: 'place-soon-1',
+					slug: 'masjid-as-sunnah-cirebon',
+					name: { id: "Masjid Jami' As-Sunnah Cirebon" },
+					address: 'Jl. Sunnah No. 7, Cirebon',
+					lat: -6.728,
+					lng: 108.57,
+					is_active: true
+				}
+			])
+		);
+	}
+});
+
 // GET /events/nearby?… (prefix match — handles any query string combination)
 prefixRoutes.push({
 	method: 'GET',
@@ -265,7 +306,7 @@ prefixRoutes.push({
 			});
 		}
 
-		if (subjectId === 'subject-empty' && radiusKm >= 100 && limit >= 30) {
+		if (subjectId === 'subject-empty' && radiusKm >= 60 && limit >= 30) {
 			return json(res, 200, {
 				success: true,
 				data: futureFallbackOccurrences(),

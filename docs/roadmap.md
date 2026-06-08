@@ -71,12 +71,12 @@ responsive, a11y ≥ 95.
 
 - [x] `domains/events`: **schema** (occurrence `EventRecurring` + `EventSeries`, from generated types + Zod at boundaries), **service** (typed client: `/events`, `/events/nearby`, `/events/:id`, `/events/series/:slug` (+`/upcoming`, `/recurrings`)), **queries** (svelte-query keys + **cursor** pagination — composite cursors for nearby), **store** (map filters + geolocation + selected pin, context-DI runes).
 - [x] **`MapView` composite**: Leaflet **client-only island** + Stadia/Stamen styled tiles (key via env), pins with **tier styling** (port `pinTierService` from cms), user-location dot, bottom-sheet/callout.
-- [x] Route **`/peta`** (map home, `MTopBar`, no back): map ↔ list toggle, date strip, subject chips, nearby feed (`lat`+`lng` **or** `region_id`), geolocation permission + region fallback.
-- [x] Route **`/kajian/[slug]`** (detail, `MTopBarBack`): time + prayer anchor, masjid, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
+- [x] Route **`/peta`** (map home, `MTopBar`, no back): full-bleed map, floating date/tema/radius filters, nearby feed (`lat`+`lng`), geolocation denied/unavailable center popup, empty-state center popup, nearby place-only pins, future-place suggestions, and custom Leaflet controls.
+- [x] Route **`/kajian/[id]`** (detail, `MTopBarBack`): time + prayer anchor, masjid, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
 - [x] **Tests**: service/store/schema unit (MSW), e2e (open `/peta` → pins → open a kajian).
 
-**Exit:** a visitor opens `/peta`, sees nearby kajian pins, filters by date/tema,
-and opens a kajian detail — all SSR, all public.
+**Exit:** a visitor opens `/peta`, sees nearby kajian and masjid pins, filters by date/tema/radius,
+and opens a kajian or tempat detail — all SSR shell, all public. Region/city picker is a follow-up PR.
 
 ---
 

@@ -103,7 +103,11 @@ function filterToolbar(page: Page) {
 }
 
 function eventPinMarkers(page: Page) {
-	return page.locator('.leaflet-marker-icon').filter({ hasText: /\d{2}:\d{2}|NOW|Besok/ });
+	return page.locator('.leaflet-marker-icon').filter({ hasText: /\d{2}:\d{2}|NOW|Besok|Nanti/ });
+}
+
+function placePinMarkers(page: Page) {
+	return page.locator('.leaflet-marker-icon').filter({ hasText: /Nanti/ });
 }
 
 async function openDateSheet(page: Page): Promise<void> {
@@ -171,6 +175,19 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(notice).toContainText('Cirebon');
 		await expect(notice.getByRole('button', { name: 'Pakai Cirebon' })).toBeVisible();
 
+		const noticeBox = await notice.boundingBox();
+		const mapBox = await page
+			.getByRole('application', { name: 'Peta kajian interaktif' })
+			.boundingBox();
+		expect(noticeBox).not.toBeNull();
+		expect(mapBox).not.toBeNull();
+		if (noticeBox && mapBox) {
+			const noticeCenterX = noticeBox.x + noticeBox.width / 2;
+			const noticeCenterY = noticeBox.y + noticeBox.height / 2;
+			expect(Math.abs(noticeCenterX - (mapBox.x + mapBox.width / 2))).toBeLessThan(32);
+			expect(Math.abs(noticeCenterY - (mapBox.y + mapBox.height / 2))).toBeLessThan(64);
+		}
+
 		await expect(async () => {
 			expect(
 				await page.evaluate(() => (window as Window & { __qaribGeoCalls?: number }).__qaribGeoCalls)
@@ -208,20 +225,27 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		const tomorrowRequest = waitForNearbyRequest(page, (params) =>
 			params.get('date_from')?.startsWith(`${tomorrowIso}T00:00:00`)
 		);
-		await page.getByRole('button', { name: 'Besok', exact: true }).click();
+		await page
+			.getByRole('dialog', { name: 'Pilih tanggal' })
+			.getByRole('button', { name: 'Besok', exact: true })
+			.click();
 		expect((await tomorrowRequest).get('date_to')).toContain(`${tomorrowIso}T23:59:59`);
 
 		await openDateSheet(page);
 
 		const customIso = addDaysIso(5);
+		const customLabel = new Intl.DateTimeFormat('id-ID', {
+			weekday: 'long',
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		}).format(new Date(`${customIso}T00:00:00`));
 		const customRequest = waitForNearbyRequest(page, (params) =>
 			params.get('date_from')?.startsWith(`${customIso}T00:00:00`)
 		);
-		const dateInput = page.locator('input[type="date"]');
-		await dateInput.evaluate((input, value) => {
-			input.value = value;
-			input.dispatchEvent(new Event('change', { bubbles: true }));
-		}, customIso);
+		await page.getByRole('button', { name: 'Tanggal lain' }).click();
+		await expect(page.getByRole('grid', { name: 'Pilih tanggal lain' })).toBeVisible();
+		await page.getByRole('button', { name: `Pilih ${customLabel}` }).click();
 		expect((await customRequest).get('date_to')).toContain(`${customIso}T23:59:59`);
 	});
 
@@ -270,14 +294,14 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		const emptySheet = page.getByRole('status').filter({ hasText: 'Belum ada di area ini' });
 		await expect(emptySheet).toBeVisible();
 		await expect(emptySheet).toContainText('radius 10 km');
-		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 25 km' })).toBeVisible();
+		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 15 km' })).toBeVisible();
 		await expect(emptySheet.getByRole('button', { name: 'Cek besok' })).toBeVisible();
 
 		await expect(emptySheet).toContainText('Masjid dengan kajian mendatang');
 		await expect(emptySheet).toContainText('Masjid Masa Depan');
-		await expect(emptySheet).toContainText('2 kajian');
+		await expect(emptySheet).toContainText('1 kajian');
 
-		for (const radius of [25, 50, 100]) {
+		for (const radius of [15, 25, 40, 60]) {
 			const request = waitForNearbyRequest(
 				page,
 				(params) =>
@@ -289,7 +313,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 			expect((await request).get('radius_km')).toBe(String(radius));
 		}
 
-		await expect(emptySheet.getByRole('button', { name: 'Radius 100 km' })).toBeVisible();
+		await expect(emptySheet.getByRole('button', { name: 'Radius 60 km' })).toBeDisabled();
 
 		await emptySheet.getByRole('button', { name: /Masjid Masa Depan/ }).click();
 		await expect(page).toHaveURL(/\/tempat\/place-future-1$/);
@@ -300,10 +324,11 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		// The two stub events belong to two different places → exactly two place pins.
+		// The two stub events belong to two places; nearby place list adds one place-only pin.
 		const markers = eventPinMarkers(page);
 		await expect(markers.first()).toBeVisible({ timeout: 10_000 });
-		await expect(markers).toHaveCount(2);
+		await expect(markers).toHaveCount(3);
+		await expect(placePinMarkers(page)).toHaveCount(1);
 	});
 
 	test('GPS FAB is rendered', async ({ page }) => {
