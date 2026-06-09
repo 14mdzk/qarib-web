@@ -3,12 +3,12 @@
  *
  * The route param `id` is the event SERIES UUID (not a slug). Fetches:
  *   - The series header (title, description, place, asatidz) via
- *     `events.seriesById` — keyed by UUID not slug.
- *   - Upcoming occurrences for the schedule strip via `events.list`
- *     filtered by `event_id` (the series UUID), starting from today.
+ *     `events.seriesById` — keyed by UUID not slug, timezone-independent.
  *
- * Both results are returned as `initialData` to seed svelte-query on the
- * client, avoiding a waterfall on first paint (same pattern as /peta).
+ * Occurrence queries are deferred to the client so the browser's local
+ * timezone can build explicit-offset RFC3339 date boundaries. SSR must
+ * not derive "today" from the server host timezone (see
+ * docs/plans/location-onboarding-settings.md, "Timezone authority").
  *
  * A 404 from the series fetch is surfaced as a SvelteKit error(404) so
  * the router renders the error page rather than an empty detail shell.
@@ -25,7 +25,6 @@ import { ApiError } from '$core/api';
 export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 	const { id } = params;
 	const requestId = locals.requestId;
-	const today = new Date().toISOString().slice(0, 10);
 
 	// Fetch the series header — 404 → surface as SvelteKit 404.
 	let seriesInitialData;
@@ -45,24 +44,7 @@ export const load: PageServerLoad = async ({ params, fetch, locals }) => {
 		throw err;
 	}
 
-	// Fetch upcoming occurrences for the schedule strip. On failure, return
-	// empty so the strip renders gracefully; the client will re-fetch.
-	let occurrencesInitialData = null;
-	try {
-		occurrencesInitialData = await api(
-			'events.list',
-			{
-				event_id: id,
-				date_from: today,
-				expand: 'place,asatidz',
-				limit: 20
-			},
-			undefined,
-			{ fetch, baseUrl: '', requestId }
-		);
-	} catch {
-		// Non-fatal — schedule strip renders empty; client re-fetches.
-	}
-
-	return { seriesInitialData, occurrencesInitialData, meta: { title: 'Daftar Kajian' } };
+	// Occurrences are fetched client-side after browser timezone init.
+	// SSR must not seed a host-timezone-derived occurrence list.
+	return { seriesInitialData, occurrencesInitialData: null, meta: { title: 'Daftar Kajian' } };
 };

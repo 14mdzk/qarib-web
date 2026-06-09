@@ -69,6 +69,14 @@ describe('toDateRange', () => {
 		expect(date_from).toBe('2026-03-08T00:00:00-05:00');
 		expect(date_to).toBe('2026-03-08T23:59:59-04:00');
 	});
+	it('preserves a half-hour offset without normalizing boundaries to Z', () => {
+		process.env.TZ = 'Asia/Kolkata';
+		const { date_from, date_to } = toDateRange('2026-05-15');
+		expect(date_from).toBe('2026-05-15T00:00:00+05:30');
+		expect(date_to).toBe('2026-05-15T23:59:59+05:30');
+		expect(date_from).not.toMatch(/Z$/);
+		expect(date_to).not.toMatch(/Z$/);
+	});
 });
 
 describe('toLocalIsoDate', () => {
