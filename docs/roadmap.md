@@ -71,13 +71,50 @@ responsive, a11y ≥ 95.
 
 - [x] `domains/events`: **schema** (occurrence `EventRecurring` + `EventSeries`, from generated types + Zod at boundaries), **service** (typed client: `/events`, `/events/nearby`, `/events/:id`, `/events/series/:slug` (+`/upcoming`, `/recurrings`)), **queries** (svelte-query keys + **cursor** pagination — composite cursors for nearby), **store** (map filters + geolocation + selected pin, context-DI runes).
 - [x] **`MapView` composite**: Leaflet **client-only island** + Stadia/Stamen styled tiles (key via env), pins with **tier styling** (port `pinTierService` from cms), user-location dot, bottom-sheet/callout.
-- [x] Route **`/peta`** (map home, `MTopBar`, no back): map ↔ list toggle, date strip, subject chips, nearby feed (`lat`+`lng` **or** `region_id`), geolocation permission + region fallback.
+- [x] Route **`/peta`** (map home, `MTopBar`, no back): full-bleed map, date/tema/radius filters, nearby feed by `lat`+`lng`, browser geolocation, and default Cirebon behavior when GPS is denied or unavailable. Manual `region_id` selection remains planned in Phase C.1.
 - [x] Route **`/kajian/[id]`** (detail, `MTopBarBack`): time + prayer anchor, venue, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
-- [x] **Phase C edge-case follow-up**: full-bleed map, floating date/tema/radius filters capped at 60 km, local-calendar month grid, denied/unavailable and empty-state center popups, neutral nearby place-only pins linking to tempat detail, future-place suggestions, and custom Leaflet controls. Region/city picker remains a follow-up.
+- [x] **Phase C edge-case follow-up**: full-bleed map, floating date/tema/radius filters capped at 60 km, local-calendar month grid, denied/unavailable and empty-state center popups, neutral nearby place-only pins linking to tempat detail, future-place suggestions, and custom Leaflet controls. The approved region/city replacement is planned, not shipped, in `docs/plans/location-onboarding-settings.md`.
 - [x] **Tests**: service/store/schema unit (MSW), e2e (open `/peta` → pins → open a kajian).
 
 **Exit:** a visitor opens `/peta`, sees nearby kajian pins, filters by date/tema,
 and opens a kajian detail — all SSR, all public.
+
+---
+
+## Phase C.1 — Location onboarding, timezone, and settings 📋 (planned)
+
+**Goal:** require an explicit GPS or province-city choice before public app
+browsing, keep calendar queries in the browser timezone, and expose location
+settings from every app header.
+
+Detailed plan: `docs/plans/location-onboarding-settings.md`.
+
+**PR1 — browser timezone contract**
+
+- [ ] Remove server-host-derived calendar days from app queries.
+- [ ] Build date boundaries as explicit-offset RFC3339 in the browser timezone.
+- [ ] Verify DST and non-Jakarta browser timezone behavior.
+
+**PR2 — onboarding and settings**
+
+- [ ] Gate every `(app)` route with a privacy-preserving completion marker;
+      keep `/` and `/lokasi` ungated.
+- [ ] Add first-run and replacement `/lokasi?returnTo=...` flows with safe
+      same-origin return validation.
+- [ ] Recover missing completion markers from valid saved preferences, and force
+      re-selection when marker exists but client preference is missing/invalid.
+- [ ] Persist a versioned GPS/manual preference client-side without coordinates
+      in cookies.
+- [ ] Add province-city selection and require manual city after denied GPS.
+- [ ] Enforce GPS coordinate queries XOR manual `region_id` queries.
+- [ ] Keep GPS radius choices at 10/15/25/40/60 km, default 10 km.
+- [ ] Add accessible mobile bottom-sheet and desktop-modal settings to every app
+      header, with `Ganti lokasi` and no delete/language controls.
+- [ ] Complete unit, component, e2e, accessibility, docs, and release-note gates.
+
+**Exit:** first-run visitors cannot enter app routes without a valid location
+choice; returning visitors can replace or cancel location changes; all
+location-dependent queries use the approved timezone and query contracts.
 
 ---
 

@@ -4,12 +4,12 @@
 
 **Goal:** The core product — **nearby kajian on a map + list + detail**, off `qarib-api`'s public read endpoints.
 
-**Architecture:** An `events` domain (typed client via `core/api` registry → svelte-query, **cursor** pagination) feeds a **Leaflet client-only `MapView`** (Stadia raster tiles **proxied through the BFF** so `STADIA_API_KEY` stays server-side — ADR 0013). Routes: `/peta` (map home, replaces the placeholder) + `/kajian/[id]` (detail). Event pins get coordinates via `/events/nearby?expand=place`; place-only pins come from `/places` with nearby filters. Geolocation denial/unavailable falls back to the default Cirebon center; full region/city picker is intentionally split into a later PR.
+**Architecture:** An `events` domain (typed client via `core/api` registry → svelte-query, **cursor** pagination) feeds a **Leaflet client-only `MapView`** (Stadia raster tiles **proxied through the BFF** so `STADIA_API_KEY` stays server-side — ADR 0013). Routes: `/peta` (map home, replaces the placeholder) + `/kajian/[id]` (detail). Event pins get coordinates via `/events/nearby?expand=place`; place-only pins come from `/places` with nearby filters. The shipped Cirebon fallback remains current. The mandatory GPS/manual flow in `docs/plans/location-onboarding-settings.md` will supersede it when implemented; this Phase C record does not claim that follow-up is shipped.
 
 **Locked facts (from generated types + qarib-api `docs/features/events.md`):**
 - Occurrence `EventRecurringResponse`: `id` (int64), `event_id` (uuid), `name`/`description` (L10n, nullable override), `asatidz_id`/`place_id` (nullable override), `date_start`/`date_end`, `date_prayer` (int), `status` (int), `going_count`, `distance_km` (nearby distance-mode only). With `expand=place,asatidz` the place (with `lat`/`lng`/`name`/`address`) + asatidz embed on each item — **the implementer must confirm the exact embedded field name in `src/lib/generated/upstream.ts`**.
 - **Status enum:** `Incoming=0, Ongoing=1, Cancelled=10, Rescheduled=11, Completed=99`.
-- **`/events/nearby`:** `lat`+`lng` or `region_id`; `radius_km`; `subject_id?`; `date_from?`/`date_to?`; `limit?`; `cursor?`; `expand?`. Forward-only cursor. `/peta` currently uses `lat`+`lng`; region/city selection is follow-up scope.
+- **`/events/nearby`:** `lat`+`lng` or `region_id`; `radius_km`; `subject_id?`; `date_from?`/`date_to?`; `limit?`; `cursor?`; `expand?`. Forward-only cursor. `/peta` currently uses `lat`+`lng`; the approved region/city and query-XOR follow-up is specified in `docs/plans/location-onboarding-settings.md` and is not shipped by this Phase C plan.
 - **Envelope/pagination:** `{success, data, pagination:{next_cursor, prev_cursor, has_more, has_prev, total?}}` — unwrapped at `core/api`. Cursor-based; **never** offset.
 - **Time display = `HH:mm` with a colon** (`18:00`), per the Hi-Fi mockups.
 
