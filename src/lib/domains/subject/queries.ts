@@ -30,37 +30,46 @@ export const subjectKeys = {
 	get: (id: string, expand?: string) => ['subject', 'get', id, expand] as const
 } as const;
 
+interface SubjectListQueryOptions {
+	enabled?: boolean | (() => boolean);
+	staleTime?: number;
+	requestId?: string;
+	initialData?: Paginated<SubjectResponse[]>;
+}
+
 // ---------------------------------------------------------------------------
 // Subject list query
 // ---------------------------------------------------------------------------
+
+export function createSubjectListQueryOptions(
+	args: ListSubjectsArgs,
+	opts?: SubjectListQueryOptions
+) {
+	return {
+		queryKey: subjectKeys.list(args),
+		queryFn: ({ signal }: { signal: AbortSignal }) =>
+			api('subject.list', args, undefined, {
+				signal,
+				requestId: opts?.requestId,
+				baseUrl: ''
+			}) as Promise<Paginated<SubjectResponse[]>>,
+		enabled: typeof opts?.enabled === 'function' ? opts.enabled() : opts?.enabled,
+		staleTime: opts?.staleTime,
+		initialData: opts?.initialData,
+		initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+	};
+}
 
 /**
  * Reactive subject-list query.
  */
 export function defineSubjectListQuery(
 	args: ListSubjectsArgs,
-	opts?: {
-		enabled?: boolean;
-		staleTime?: number;
-		requestId?: string;
-		initialData?: Paginated<SubjectResponse[]>;
-	},
+	opts?: SubjectListQueryOptions,
 	queryClient?: QueryClient
 ) {
 	return createQuery<Paginated<SubjectResponse[]>>(
-		() => ({
-			queryKey: subjectKeys.list(args),
-			queryFn: ({ signal }: { signal: AbortSignal }) =>
-				api('subject.list', args, undefined, {
-					signal,
-					requestId: opts?.requestId,
-					baseUrl: ''
-				}) as Promise<Paginated<SubjectResponse[]>>,
-			enabled: opts?.enabled,
-			staleTime: opts?.staleTime,
-			initialData: opts?.initialData,
-			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
-		}),
+		() => createSubjectListQueryOptions(args, opts),
 		queryClient ? () => queryClient : undefined
 	);
 }

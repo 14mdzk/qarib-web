@@ -22,10 +22,15 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+test.describe.configure({ mode: 'serial' });
+
 function addDaysIso(days: number): string {
 	const date = new Date();
 	date.setDate(date.getDate() + days);
-	return date.toISOString().slice(0, 10);
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
 }
 
 async function useCirebonGeolocation(page: Page): Promise<void> {
@@ -106,6 +111,10 @@ function eventPinMarkers(page: Page) {
 	return page.locator('.leaflet-marker-icon').filter({ hasText: /\d{2}:\d{2}|NOW|Besok/ });
 }
 
+function placePinMarkers(page: Page) {
+	return page.locator('.leaflet-marker-icon').filter({ hasText: /Masjid/ });
+}
+
 async function openDateSheet(page: Page): Promise<void> {
 	await filterToolbar(page).getByRole('button').first().click();
 	await expect(page.getByRole('dialog', { name: 'Pilih tanggal' })).toBeVisible();
@@ -132,6 +141,7 @@ async function selectSubject(
 
 test.describe('/peta — Hi-Fi v2 map home', () => {
 	test.describe.configure({ mode: 'serial' });
+	test.use({ timezoneId: 'Asia/Jakarta' });
 
 	test.beforeEach(async ({ page }) => {
 		await useCirebonGeolocation(page);
@@ -142,7 +152,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		page.on('request', (request) => {
 			if (!request.url().includes('/api/upstream/events/nearby')) return;
 			const params = new URL(request.url()).searchParams;
-			if (params.get('limit') === '30' && params.get('radius_km') === '100') {
+			if (params.get('limit') === '30' && params.get('radius_km') === '60') {
 				fallbackRequests.push(params);
 			}
 		});
@@ -170,6 +180,19 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(notice).toBeVisible();
 		await expect(notice).toContainText('Cirebon');
 		await expect(notice.getByRole('button', { name: 'Pakai Cirebon' })).toBeVisible();
+
+		const noticeBox = await notice.boundingBox();
+		const mapBox = await page
+			.getByRole('application', { name: 'Peta kajian interaktif' })
+			.boundingBox();
+		expect(noticeBox).not.toBeNull();
+		expect(mapBox).not.toBeNull();
+		if (noticeBox && mapBox) {
+			const noticeCenterX = noticeBox.x + noticeBox.width / 2;
+			const noticeCenterY = noticeBox.y + noticeBox.height / 2;
+			expect(Math.abs(noticeCenterX - (mapBox.x + mapBox.width / 2))).toBeLessThan(32);
+			expect(Math.abs(noticeCenterY - (mapBox.y + mapBox.height / 2))).toBeLessThan(64);
+		}
 
 		await expect(async () => {
 			expect(
@@ -208,21 +231,59 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		const tomorrowRequest = waitForNearbyRequest(page, (params) =>
 			params.get('date_from')?.startsWith(`${tomorrowIso}T00:00:00`)
 		);
-		await page.getByRole('button', { name: 'Besok', exact: true }).click();
+		await page
+			.getByRole('dialog', { name: 'Pilih tanggal' })
+			.getByRole('button', { name: 'Besok', exact: true })
+			.click();
 		expect((await tomorrowRequest).get('date_to')).toContain(`${tomorrowIso}T23:59:59`);
 
 		await openDateSheet(page);
 
 		const customIso = addDaysIso(5);
+		const customLabel = new Intl.DateTimeFormat('id-ID', {
+			weekday: 'long',
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		}).format(new Date(`${customIso}T00:00:00`));
 		const customRequest = waitForNearbyRequest(page, (params) =>
 			params.get('date_from')?.startsWith(`${customIso}T00:00:00`)
 		);
-		const dateInput = page.locator('input[type="date"]');
-		await dateInput.evaluate((input, value) => {
-			input.value = value;
-			input.dispatchEvent(new Event('change', { bubbles: true }));
-		}, customIso);
+		await page.getByRole('button', { name: 'Tanggal lain' }).click();
+		await expect(page.getByRole('grid', { name: 'Pilih tanggal lain' })).toBeVisible();
+		await page.getByRole('button', { name: `Pilih ${customLabel}` }).click();
 		expect((await customRequest).get('date_to')).toContain(`${customIso}T23:59:59`);
+	});
+
+	test('calendar keeps Jakarta-visible June 1 as 2026-06-01', async ({ page }) => {
+		await page.clock.setFixedTime(new Date('2026-06-01T00:30:00+07:00'));
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await openDateSheet(page);
+		await page
+			.getByRole('dialog', { name: 'Pilih tanggal' })
+			.getByRole('button', { name: 'Besok', exact: true })
+			.click();
+
+		await openDateSheet(page);
+		await page.getByRole('button', { name: 'Tanggal lain' }).click();
+		const juneFirst = page.getByRole('button', { name: 'Pilih Senin, 1 Juni 2026' });
+		await expect(juneFirst).toBeVisible();
+		await juneFirst.click();
+		await expect(filterToolbar(page).getByRole('button', { name: 'Hari ini' })).toBeVisible();
+	});
+
+	test('calendar month navigation moves January 31 to February', async ({ page }) => {
+		await page.clock.setFixedTime(new Date('2026-01-31T12:00:00+07:00'));
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await openDateSheet(page);
+		await page.getByRole('button', { name: 'Tanggal lain' }).click();
+		await expect(page.getByText('Januari 2026', { exact: true })).toBeVisible();
+		await page.getByRole('button', { name: 'Bulan berikutnya' }).click();
+		await expect(page.getByText('Februari 2026', { exact: true })).toBeVisible();
 	});
 
 	test('subject selector loads subjects and filters nearby query by subject_id', async ({
@@ -249,6 +310,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		await expect(filterToolbar(page).getByRole('button', { name: 'Tafsir' })).toBeVisible();
 		await expect(eventPinMarkers(page)).toHaveCount(1);
+		await expect(placePinMarkers(page)).toHaveCount(0);
 	});
 
 	test('empty filtered results keep the map visible, expand radius, and group future place suggestions', async ({
@@ -270,14 +332,14 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		const emptySheet = page.getByRole('status').filter({ hasText: 'Belum ada di area ini' });
 		await expect(emptySheet).toBeVisible();
 		await expect(emptySheet).toContainText('radius 10 km');
-		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 25 km' })).toBeVisible();
+		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 15 km' })).toBeVisible();
 		await expect(emptySheet.getByRole('button', { name: 'Cek besok' })).toBeVisible();
 
 		await expect(emptySheet).toContainText('Masjid dengan kajian mendatang');
 		await expect(emptySheet).toContainText('Masjid Masa Depan');
-		await expect(emptySheet).toContainText('2 kajian');
+		await expect(emptySheet).toContainText('1 kajian');
 
-		for (const radius of [25, 50, 100]) {
+		for (const radius of [15, 25, 40, 60]) {
 			const request = waitForNearbyRequest(
 				page,
 				(params) =>
@@ -289,7 +351,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 			expect((await request).get('radius_km')).toBe(String(radius));
 		}
 
-		await expect(emptySheet.getByRole('button', { name: 'Radius 100 km' })).toBeVisible();
+		await expect(emptySheet.getByRole('button', { name: 'Radius 60 km' })).toBeDisabled();
 
 		await emptySheet.getByRole('button', { name: /Masjid Masa Depan/ }).click();
 		await expect(page).toHaveURL(/\/tempat\/place-future-1$/);
@@ -300,10 +362,52 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		// The two stub events belong to two different places → exactly two place pins.
+		// The two stub events belong to two places; nearby place list adds one place-only pin.
 		const markers = eventPinMarkers(page);
 		await expect(markers.first()).toBeVisible({ timeout: 10_000 });
 		await expect(markers).toHaveCount(2);
+		await expect(placePinMarkers(page)).toHaveCount(1);
+	});
+
+	test('waits for events before classifying nearby places as place-only', async ({ page }) => {
+		let releaseEvents!: () => void;
+		const eventsBlocked = new Promise<void>((resolve) => {
+			releaseEvents = resolve;
+		});
+		await page.route('**/api/upstream/events/nearby?**', async (route) => {
+			await eventsBlocked;
+			await route.continue();
+		});
+
+		const placesResponse = page.waitForResponse(
+			(response) => response.url().includes('/api/upstream/places?') && response.ok()
+		);
+		await page.goto('/peta');
+		await placesResponse;
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await expect(placePinMarkers(page)).toHaveCount(0);
+		await expect(eventPinMarkers(page)).toHaveCount(0);
+
+		releaseEvents();
+		await expect(eventPinMarkers(page)).toHaveCount(2);
+		await expect(placePinMarkers(page)).toHaveCount(1);
+
+		await eventPinMarkers(page).first().click();
+		await expect(page).toHaveURL(/\/peta$/);
+		await expect(page.getByRole('complementary').first()).toBeVisible();
+	});
+
+	test('place-only pin routes to tempat without opening PinSheet', async ({ page }) => {
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		const placePin = placePinMarkers(page);
+		await expect(placePin).toHaveCount(1);
+		await placePin.click();
+
+		await expect(page).toHaveURL(/\/tempat\/place-soon-1$/);
+		await expect(page.getByRole('complementary')).toHaveCount(0);
 	});
 
 	test('GPS FAB is rendered', async ({ page }) => {
@@ -396,5 +500,24 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		// Sheet should be gone.
 		await expect(sheet).not.toBeVisible({ timeout: 3_000 });
+	});
+});
+
+test.describe('/peta — browser-local date bounds', () => {
+	test.use({ timezoneId: 'America/New_York' });
+
+	test('uses separate local offsets across DST transition day', async ({ page }) => {
+		await useCirebonGeolocation(page);
+		await page.clock.setFixedTime(new Date('2026-03-08T12:00:00-04:00'));
+		const request = waitForNearbyRequest(
+			page,
+			(params) =>
+				params.get('date_from') === '2026-03-08T00:00:00-05:00' &&
+				params.get('date_to') === '2026-03-08T23:59:59-04:00'
+		);
+
+		await page.goto('/peta');
+
+		expect((await request).get('date_from')).toBe('2026-03-08T00:00:00-05:00');
 	});
 });

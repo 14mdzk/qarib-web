@@ -9,6 +9,8 @@ once it tags a release.
 
 ### Added
 
+- `/peta` edge-case UX reconciliation: centered map popups for location/error/empty states, local-calendar month-grid date picker, radius config sheet with `10 → 15 → 25 → 40 → 60 km` steps, neutral nearby place-only pins linking to tempat detail, and future-place counts deduped by event series (`event_id`). Region/city picker remains separate follow-up scope.
+
 - **Phase 1 — Skeleton wiring.**
   - Adapter swap: `@sveltejs/adapter-auto` → `@sveltejs/adapter-node`.
   - Runtime deps: `zod`, `@tanstack/svelte-query`, `pino`, `@inlang/paraglide-js`.

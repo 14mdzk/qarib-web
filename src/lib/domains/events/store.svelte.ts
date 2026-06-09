@@ -21,8 +21,8 @@ import { getContext, setContext } from 'svelte';
 const KEY = Symbol('eventsView');
 
 export const DEFAULT_RADIUS_KM = 10;
-export const MAX_RADIUS_KM = 100;
-export const RADIUS_STEPS_KM = [10, 25, 50, 100] as const;
+export const MAX_RADIUS_KM = 60;
+export const RADIUS_STEPS_KM = [10, 15, 25, 40, 60] as const;
 
 // ---------------------------------------------------------------------------
 // Service class

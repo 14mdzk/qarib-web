@@ -4,6 +4,9 @@ export {
 	formatDate,
 	formatTime,
 	formatDistance,
+	toLocalIsoDate,
+	shiftCalendarMonth,
+	getWeekdayLabels,
 	toDateRange,
 	getRelativeDateLabel
 } from './date.js';

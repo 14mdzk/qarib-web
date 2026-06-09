@@ -73,6 +73,7 @@ responsive, a11y ≥ 95.
 - [x] **`MapView` composite**: Leaflet **client-only island** + Stadia/Stamen styled tiles (key via env), pins with **tier styling** (port `pinTierService` from cms), user-location dot, bottom-sheet/callout.
 - [x] Route **`/peta`** (map home, `MTopBar`, no back): map ↔ list toggle, date strip, subject chips, nearby feed (`lat`+`lng` **or** `region_id`), geolocation permission + region fallback.
 - [x] Route **`/kajian/[id]`** (detail, `MTopBarBack`): time + prayer anchor, venue, ustadz, subject, status (Incoming/Ongoing/Cancelled/Rescheduled/Completed = 0/1/10/11/99).
+- [x] **Phase C edge-case follow-up**: full-bleed map, floating date/tema/radius filters capped at 60 km, local-calendar month grid, denied/unavailable and empty-state center popups, neutral nearby place-only pins linking to tempat detail, future-place suggestions, and custom Leaflet controls. Region/city picker remains a follow-up.
 - [x] **Tests**: service/store/schema unit (MSW), e2e (open `/peta` → pins → open a kajian).
 
 **Exit:** a visitor opens `/peta`, sees nearby kajian pins, filters by date/tema,

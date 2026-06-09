@@ -10,30 +10,44 @@
 	import MapFilterChips from '$lib/shared/composites/map-filter-chips.svelte';
 	import type { FilterChip } from '$lib/shared/composites/map-filter-chips.svelte';
 	import MapFab from '$lib/shared/composites/map-fab.svelte';
-	import { toDateRange, formatTime, formatDistance } from '$lib/shared/utils/date.js';
-	import { createLocation, DEFAULT_CENTER } from '$core/location/index.svelte.js';
+	import {
+		addIsoDateDays,
+		formatDistance,
+		formatIsoDate,
+		formatTime,
+		getWeekdayLabels,
+		shiftCalendarMonth,
+		toDateRange,
+		toLocalIsoDate
+	} from '$lib/shared/utils/date.js';
+	import { createLocation } from '$core/location/index.svelte.js';
 	import {
 		createEventsView,
-		DEFAULT_RADIUS_KM,
 		MAX_RADIUS_KM,
 		RADIUS_STEPS_KM
 	} from '$domains/events/store.svelte.js';
 	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
+	import { definePlaceListQuery } from '$domains/places/queries.js';
 	import { defineSubjectListQuery } from '$domains/subject/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
-	import { groupOccurrencesToPlacePins } from '$domains/events/place-pins.js';
-	import type { Paginated } from '$core/api';
-	import type {
-		EventRecurringResponse,
-		EventRecurringResponseWithPlace
-	} from '$domains/events/schema.js';
+	import {
+		groupFuturePlaces,
+		groupOccurrencesToPlacePins,
+		mergeNearbyPlacesWithEventPins
+	} from '$domains/events/place-pins.js';
+	import type { EventRecurringResponseWithPlace } from '$domains/events/schema.js';
 	import type { SubjectResponse } from '$domains/subject/schema.js';
-	import type { InfiniteData } from '@tanstack/svelte-query';
-	import type { PageData } from './$types';
-	import { CalendarDays, GlobeOff, ListFilter, Map as MapIcon, MapPin } from '@lucide/svelte';
+	import {
+		CalendarDays,
+		ChevronLeft,
+		ChevronRight,
+		GlobeOff,
+		ListFilter,
+		Map as MapIcon,
+		MapPin,
+		Radar
+	} from '@lucide/svelte';
 	import { l10n } from '$shared/utils/l10n';
-
-	let { data }: { data: PageData } = $props();
 
 	// ---------------------------------------------------------------------------
 	// Context-DI: instantiate location + view stores at page scope
@@ -41,52 +55,76 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
-	let activeFilterSheet = $state<'date' | 'subject' | null>(null);
+	let browserReady = $state(false);
+	let todayIso = $state<string | null>(null);
+	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
+	let customDatePickerOpen = $state(false);
+	let calendarMonth = $state<string | null>(null);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
 	// ---------------------------------------------------------------------------
 
-	function buildDateStrip(): { label: string; iso: string }[] {
+	function buildDateStrip(today: string): { label: string; iso: string }[] {
 		const days: { label: string; iso: string }[] = [];
-		const now = new Date();
 		for (let i = 0; i < 7; i++) {
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- static non-reactive computation
-			const d = new Date(now);
-			d.setDate(d.getDate() + i);
-			const iso = d.toISOString().slice(0, 10);
+			const iso = addIsoDateDays(today, i);
 			const label =
-				i === 0
-					? m.peta_date_today()
-					: new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric' }).format(d);
+				i === 0 ? m.peta_date_today() : formatIsoDate(iso, { weekday: 'short', day: 'numeric' });
 			days.push({ label, iso });
 		}
 		return days;
 	}
 
-	const dateStrip = buildDateStrip();
+	const dateStrip = $derived(todayIso ? buildDateStrip(todayIso) : []);
 
-	function addDaysIso(days: number): string {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- pure date arithmetic helper, not component state.
-		const d = new Date();
-		d.setDate(d.getDate() + days);
-		return d.toISOString().slice(0, 10);
+	function addDaysIso(days: number): string | null {
+		return todayIso ? addIsoDateDays(todayIso, days) : null;
 	}
 
 	const tomorrowIso = $derived(dateStrip[1]?.iso ?? addDaysIso(1));
 
-	function formatDateChip(iso: string): string {
-		if (iso === dateStrip[0].iso) return m.peta_filter_date_today();
+	function formatDateChip(iso: string | null): string {
+		if (!iso || iso === dateStrip[0]?.iso) return m.peta_filter_date_today();
 		if (iso === tomorrowIso) return m.peta_filter_date_tomorrow();
-		return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(
-			new Date(`${iso}T00:00:00`)
-		);
+		return formatIsoDate(iso, { day: 'numeric', month: 'short' });
 	}
 
-	function futureRange(): { date_from: string; date_to: string } {
+	function formatFullDate(iso: string): string {
+		return formatIsoDate(iso, {
+			weekday: 'long',
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		});
+	}
+
+	function buildCalendarGrid(monthDate: string): Array<{
+		iso: string;
+		label: string;
+		inMonth: boolean;
+	}> {
+		const [year, month] = monthDate.split('-').map(Number);
+		const firstWeekday = new Date(year, month - 1, 1, 12).getDay();
+		const start = addIsoDateDays(monthDate, -firstWeekday);
+		const days: Array<{ iso: string; label: string; inMonth: boolean }> = [];
+		for (let i = 0; i < 42; i++) {
+			const iso = addIsoDateDays(start, i);
+			days.push({
+				iso,
+				label: formatIsoDate(iso, { day: 'numeric' }),
+				inMonth: iso.slice(0, 7) === monthDate.slice(0, 7)
+			});
+		}
+		return days;
+	}
+
+	function futureRange(): { date_from: string; date_to: string } | null {
+		if (!tomorrowIso) return null;
 		const start = toDateRange(tomorrowIso);
-		const end = toDateRange(addDaysIso(14));
+		const futureEnd = addDaysIso(14);
+		const end = toDateRange(futureEnd ?? tomorrowIso);
 		return { date_from: start.date_from, date_to: end.date_to };
 	}
 
@@ -94,61 +132,57 @@
 		return RADIUS_STEPS_KM.find((step) => step > current) ?? MAX_RADIUS_KM;
 	}
 
-	const DEFAULT_CENTER_TOLERANCE = 0.0001;
+	function previousMonth(): void {
+		if (calendarMonth) calendarMonth = shiftCalendarMonth(calendarMonth, -1);
+	}
 
-	function isDefaultCenter(center: { lat: number; lng: number }): boolean {
-		return (
-			Math.abs(center.lat - DEFAULT_CENTER.lat) <= DEFAULT_CENTER_TOLERANCE &&
-			Math.abs(center.lng - DEFAULT_CENTER.lng) <= DEFAULT_CENTER_TOLERANCE
-		);
+	function nextMonth(): void {
+		if (calendarMonth) calendarMonth = shiftCalendarMonth(calendarMonth, 1);
 	}
 
 	// ---------------------------------------------------------------------------
 	// Svelte-query: cursor-paginated nearby feed (state-management.md rule)
 	// ---------------------------------------------------------------------------
 
-	const activeDay = $derived(eventsView.selectedDate ?? dateStrip[0].iso);
-	const dateRange = $derived(toDateRange(activeDay));
+	const activeDay = $derived(eventsView.selectedDate ?? todayIso);
+	const dateRange = $derived(activeDay ? toDateRange(activeDay) : null);
+	const dateReady = $derived(activeDay != null && dateRange != null);
 
 	const queryArgs = $derived({
 		lat: location.center.lat,
 		lng: location.center.lng,
 		radius_km: eventsView.selectedRadiusKm,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: dateRange.date_from,
-		date_to: dateRange.date_to,
+		date_from: dateRange?.date_from,
+		date_to: dateRange?.date_to,
 		expand: 'place',
 		limit: 10
 	});
 
-	const initialDataStillMatches = $derived(
-		location.mode === 'default' &&
-			isDefaultCenter(location.center) &&
-			activeDay === dateStrip[0].iso &&
-			eventsView.selectedRadiusKm === DEFAULT_RADIUS_KM &&
-			eventsView.selectedSubjectId == null
-	);
-
-	// SSR seed
-	const _initData = $derived(data.initialData as Paginated<EventRecurringResponse[]> | null);
-
 	const query = defineNearbyInfiniteQuery(() => ({
 		args: queryArgs,
-		initialData:
-			_initData && initialDataStillMatches
-				? ({
-						pages: [_initData],
-						pageParams: [null]
-					} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
-				: undefined
+		enabled: dateReady
 	}));
 
 	// Derived flat list from all pages.
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
 
+	const nearbyPlaceArgs = $derived({
+		near_lat: location.center.lat,
+		near_lng: location.center.lng,
+		radius_km: eventsView.selectedRadiusKm,
+		is_active: true,
+		limit: 30
+	});
+	const nearbyPlacesQuery = definePlaceListQuery(() => nearbyPlaceArgs, {
+		enabled: () => browserReady && eventsView.selectedSubjectId == null,
+		staleTime: 60_000
+	});
+	const nearbyPlaces = $derived(nearbyPlacesQuery.data?.data ?? []);
+
 	const subjectQuery = defineSubjectListQuery(
 		{ limit: 100, is_active: true },
-		{ staleTime: 5 * 60_000 }
+		{ enabled: () => browserReady, staleTime: 5 * 60_000 }
 	);
 	const subjects = $derived((subjectQuery.data?.data ?? []) as SubjectResponse[]);
 	const selectedSubject = $derived(
@@ -166,12 +200,14 @@
 		lng: location.center.lng,
 		radius_km: MAX_RADIUS_KM,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: fallbackDateRange.date_from,
-		date_to: fallbackDateRange.date_to,
+		date_from: fallbackDateRange?.date_from,
+		date_to: fallbackDateRange?.date_to,
 		expand: 'place',
 		limit: 30
 	});
-	const fallbackEnabled = $derived(query.isSuccess && events.length === 0 && !showLocationNotice);
+	const fallbackEnabled = $derived(
+		dateReady && query.isSuccess && events.length === 0 && !showLocationNotice
+	);
 	const fallbackQuery = defineNearbyInfiniteQuery(() => ({
 		args: fallbackArgs,
 		enabled: fallbackEnabled
@@ -184,14 +220,22 @@
 	// Place pins — grouped by mosque (v2: one pin per place, not per occurrence)
 	// ---------------------------------------------------------------------------
 
-	const placePins = $derived(
+	const eventPlacePins = $derived(
 		groupOccurrencesToPlacePins(events as EventRecurringResponseWithPlace[], {
 			now: m.pin_label_now(),
 			later: m.pin_label_later()
-		}).map((pin) => ({
-			...pin,
-			selected: pin.id === eventsView.selectedPlaceId
-		}))
+		})
+	);
+	const placeOnlyPinsSource = $derived(
+		query.isSuccess && eventsView.selectedSubjectId == null ? nearbyPlaces : []
+	);
+	const placePins = $derived(
+		mergeNearbyPlacesWithEventPins(eventPlacePins, placeOnlyPinsSource, m.pin_label_place()).map(
+			(pin) => ({
+				...pin,
+				selected: pin.id === eventsView.selectedPlaceId
+			})
+		)
 	);
 
 	// Map center + userLocation derived from location store.
@@ -216,6 +260,11 @@
 				value: selectedSubject ? l10n(selectedSubject.name) : m.peta_filter_subject_all()
 			}),
 			active: activeFilterSheet === 'subject'
+		},
+		{
+			key: 'radius',
+			label: m.peta_filter_radius_label({ value: eventsView.selectedRadiusKm }),
+			active: activeFilterSheet === 'radius'
 		}
 	]);
 
@@ -241,6 +290,7 @@
 				)
 			: []
 	);
+	const selectedPlaceHasTodayEvents = $derived(selectedPlaceOccurrences.length > 0);
 
 	const sheetPlace = $derived<SheetPlace | null>(
 		selectedPlaceOccurrences.length > 0
@@ -283,7 +333,7 @@
 
 	const queryContextKey = $derived(
 		[
-			activeDay,
+			activeDay ?? '',
 			eventsView.selectedRadiusKm,
 			eventsView.selectedSubjectId ?? '',
 			location.center.lat.toFixed(5),
@@ -322,6 +372,7 @@
 
 	function chooseDate(iso: string | null): void {
 		eventsView.selectDate(iso);
+		customDatePickerOpen = false;
 		activeFilterSheet = null;
 	}
 
@@ -334,54 +385,29 @@
 		eventsView.expandRadius();
 	}
 
-	function groupFallbackPlaces(items: EventRecurringResponseWithPlace[]): Array<{
-		id: string;
-		name: string;
-		address: string;
-		count: number;
-		nextLabel: string;
-	}> {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local grouping accumulator, not reactive state.
-		const byPlace = new Map<
-			string,
-			{
-				name: string;
-				address: string;
-				dates: string[];
-			}
-		>();
-
-		for (const event of items) {
-			if (!event.place?.id || !event.date_start) continue;
-			const existing = byPlace.get(event.place.id);
-			if (existing) {
-				existing.dates.push(event.date_start);
-				continue;
-			}
-			byPlace.set(event.place.id, {
-				name: l10n(event.place.name),
-				address: event.place.address ?? '',
-				dates: [event.date_start]
-			});
-		}
-
-		return [...byPlace.entries()]
-			.map(([id, place]) => {
-				const sortedDates = place.dates.toSorted(
-					(a, b) => new Date(a).getTime() - new Date(b).getTime()
-				);
-				return {
-					id,
-					name: place.name,
-					address: place.address,
-					count: place.dates.length,
-					nextLabel: sortedDates[0] ? formatDateChip(sortedDates[0].slice(0, 10)) : ''
-				};
-			})
-			.slice(0, 4);
+	function selectRadius(radiusKm: number): void {
+		eventsView.selectRadius(radiusKm);
+		activeFilterSheet = null;
 	}
 
-	const fallbackPlaces = $derived(groupFallbackPlaces(fallbackEvents));
+	function handlePinClick(id: string | number): void {
+		const placeId = typeof id === 'string' ? id : String(id);
+		const hasTodayEvent = (events as EventRecurringResponseWithPlace[]).some(
+			(e) => e.place?.id === placeId
+		);
+		if (hasTodayEvent) {
+			eventsView.selectPlace(placeId);
+		} else {
+			navigateToPlace(placeId);
+		}
+	}
+
+	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
+	const calendarDays = $derived(calendarMonth ? buildCalendarGrid(calendarMonth) : []);
+	const calendarMonthLabel = $derived(
+		calendarMonth ? formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' }) : ''
+	);
+	const weekdayLabels = getWeekdayLabels('id-ID');
 
 	// ---------------------------------------------------------------------------
 	// Ghost pins for cold-load state (scattered static positions, decorative)
@@ -390,6 +416,10 @@
 	const GHOST_PIN_DELAYS = ['0s', '0.3s', '0.6s', '0.9s', '1.2s'];
 
 	onMount(() => {
+		browserReady = true;
+		const localToday = toLocalIsoDate(new Date());
+		todayIso = localToday;
+		calendarMonth = `${localToday.slice(0, 7)}-01`;
 		// requestGps() updates location.center on success → queryArgs changes →
 		// createInfiniteQuery re-fetches automatically (new queryKey).
 		location.requestGps();
@@ -414,9 +444,7 @@
 				zoom={13}
 				pins={placePins}
 				{userLocation}
-				onpinclick={(id) => {
-					eventsView.selectPlace(typeof id === 'string' ? id : String(id));
-				}}
+				onpinclick={handlePinClick}
 			/>
 		</ContentDim>
 	{:else}
@@ -425,9 +453,7 @@
 			zoom={13}
 			pins={placePins}
 			{userLocation}
-			onpinclick={(id) => {
-				eventsView.selectPlace(typeof id === 'string' ? id : String(id));
-			}}
+			onpinclick={handlePinClick}
 		/>
 	{/if}
 
@@ -550,7 +576,11 @@
 				</div>
 			</div>
 			<div class="edge-sheet__actions">
-				<button class="edge-sheet__button edge-sheet__button--primary" onclick={expandRadius}>
+				<button
+					class="edge-sheet__button edge-sheet__button--primary"
+					onclick={expandRadius}
+					disabled={eventsView.selectedRadiusKm >= MAX_RADIUS_KM}
+				>
 					{eventsView.selectedRadiusKm >= MAX_RADIUS_KM
 						? m.peta_radius_max_action()
 						: m.peta_radius_expand_action({
@@ -592,7 +622,7 @@
 	<MapFilterChips
 		chips={filterChips}
 		onselect={(key) => {
-			activeFilterSheet = activeFilterSheet === key ? null : (key as 'date' | 'subject');
+			activeFilterSheet = activeFilterSheet === key ? null : (key as 'date' | 'subject' | 'radius');
 		}}
 	/>
 
@@ -603,24 +633,47 @@
 				<span>{m.peta_date_sheet_title()}</span>
 			</div>
 			<div class="filter-sheet__options">
-				<button class:active={activeDay === dateStrip[0].iso} onclick={() => chooseDate(null)}>
+				<button class:active={activeDay === dateStrip[0]?.iso} onclick={() => chooseDate(null)}>
 					{m.peta_filter_date_today()}
 				</button>
 				<button class:active={activeDay === tomorrowIso} onclick={() => chooseDate(tomorrowIso)}>
 					{m.peta_filter_date_tomorrow()}
 				</button>
-				<label>
-					<span>{m.peta_filter_date_custom()}</span>
-					<input
-						type="date"
-						value={activeDay}
-						onchange={(event) => {
-							const value = event.currentTarget.value;
-							if (value) chooseDate(value);
-						}}
-					/>
-				</label>
+				<button onclick={() => (customDatePickerOpen = !customDatePickerOpen)}>
+					{m.peta_filter_date_custom()}
+				</button>
 			</div>
+			{#if customDatePickerOpen}
+				<div class="date-picker">
+					<div class="date-picker__head">
+						<button type="button" onclick={previousMonth} aria-label={m.peta_date_previous_month()}>
+							<ChevronLeft class="size-4" aria-hidden="true" />
+						</button>
+						<span>{calendarMonthLabel}</span>
+						<button type="button" onclick={nextMonth} aria-label={m.peta_date_next_month()}>
+							<ChevronRight class="size-4" aria-hidden="true" />
+						</button>
+					</div>
+					<div class="date-picker__weekdays" aria-hidden="true">
+						{#each weekdayLabels as weekday (weekday)}
+							<span>{weekday}</span>
+						{/each}
+					</div>
+					<div class="date-picker__grid" role="grid" aria-label={m.peta_date_custom_grid_label()}>
+						{#each calendarDays as day (day.iso)}
+							<button
+								type="button"
+								class:outside={!day.inMonth}
+								class:active={day.iso === activeDay}
+								aria-label={m.peta_date_pick_label({ date: formatFullDate(day.iso) })}
+								onclick={() => chooseDate(day.iso)}
+							>
+								{day.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
@@ -655,12 +708,36 @@
 		</div>
 	{/if}
 
+	{#if activeFilterSheet === 'radius'}
+		<div
+			class="filter-sheet filter-sheet--radius"
+			role="dialog"
+			aria-label={m.peta_radius_sheet_title()}
+		>
+			<div class="filter-sheet__header">
+				<Radar class="size-4" aria-hidden="true" />
+				<span>{m.peta_radius_sheet_title()}</span>
+			</div>
+			<p class="filter-sheet__lede">{m.peta_radius_sheet_body()}</p>
+			<div class="radius-options">
+				{#each RADIUS_STEPS_KM as radius (radius)}
+					<button
+						class:active={eventsView.selectedRadiusKm === radius}
+						onclick={() => selectRadius(radius)}
+					>
+						{m.peta_filter_radius_label({ value: radius })}
+					</button>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
 	<!-- GPS FAB — bottom-right, lifts above pin sheet when open.
 	     --map-fab-bottom inherited from the container via CSS variable cascade. -->
 	<MapFab onlocate={() => location.requestGps()} loading={location.requesting} />
 
 	<!-- Pin sheet — shown when a place is selected -->
-	{#if eventsView.selectedPlaceId != null && sheetPlace != null}
+	{#if eventsView.selectedPlaceId != null && sheetPlace != null && selectedPlaceHasTodayEvents}
 		<PinSheet
 			place={sheetPlace}
 			events={sheetEvents}
@@ -706,7 +783,11 @@
 
 	.edge-sheet,
 	.empty-sheet {
-		bottom: 12px;
+		top: 50%;
+		left: 50%;
+		right: auto;
+		width: min(calc(100% - 32px), 380px);
+		transform: translate(-50%, -50%);
 		border-radius: var(--radius-lg);
 		padding: 14px;
 	}
@@ -787,9 +868,13 @@
 		color: var(--color-ink-2);
 	}
 
+	.edge-sheet__button:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
 	.edge-sheet__button:focus-visible,
 	.filter-sheet button:focus-visible,
-	.filter-sheet input:focus-visible,
 	.fallback-place:focus-visible {
 		outline: 2px solid var(--color-orange);
 		outline-offset: 2px;
@@ -900,8 +985,14 @@
 		padding-right: 2px;
 	}
 
-	.filter-sheet button,
-	.filter-sheet label {
+	.filter-sheet__lede {
+		margin: -2px 0 10px;
+		color: var(--color-ink-3);
+		font-size: 12px;
+		line-height: 1.45;
+	}
+
+	.filter-sheet button {
 		min-height: 36px;
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--color-line);
@@ -927,24 +1018,74 @@
 		color: var(--color-paper);
 	}
 
-	.filter-sheet input {
-		border: 1px solid var(--color-line);
-		border-radius: var(--radius-sm);
-		background: var(--color-paper);
+	.date-picker {
+		margin-top: 10px;
+		border-radius: var(--radius);
+		background: var(--color-paper-2);
+		padding: 10px;
+	}
+
+	.date-picker__head {
+		display: grid;
+		grid-template-columns: 36px 1fr 36px;
+		align-items: center;
+		gap: 6px;
+		margin-bottom: 10px;
 		color: var(--color-ink);
-		font-family: inherit;
-		font-size: 12px;
-		padding: 4px 7px;
+		font-size: 13px;
+		font-weight: 800;
+		text-align: center;
+	}
+
+	.date-picker__head button {
+		min-height: 32px;
+		justify-content: center;
+		padding: 0;
+		border-radius: 50%;
+		background: var(--color-paper);
+	}
+
+	.date-picker__weekdays,
+	.date-picker__grid {
+		display: grid;
+		grid-template-columns: repeat(7, minmax(0, 1fr));
+		gap: 5px;
+	}
+
+	.date-picker__weekdays {
+		margin-bottom: 6px;
+		color: var(--color-ink-4);
+		font-size: 10px;
+		font-weight: 800;
+		text-align: center;
+		text-transform: uppercase;
+	}
+
+	.date-picker__grid button {
+		min-height: 34px;
+		justify-content: center;
+		padding: 0;
+		border-radius: 50%;
+		background: var(--color-paper);
+	}
+
+	.date-picker__grid button.outside {
+		color: var(--color-ink-4);
+		opacity: 0.5;
+	}
+
+	.radius-options {
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
+		gap: 6px;
+	}
+
+	.radius-options button {
+		justify-content: center;
+		padding: 0 6px;
 	}
 
 	@media (min-width: 640px) {
-		.edge-sheet,
-		.empty-sheet {
-			right: 18px;
-			left: auto;
-			width: 360px;
-		}
-
 		.filter-sheet {
 			left: 10px;
 			right: auto;

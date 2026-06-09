@@ -4,12 +4,12 @@
 
 **Goal:** The core product — **nearby kajian on a map + list + detail**, off `qarib-api`'s public read endpoints.
 
-**Architecture:** An `events` domain (typed client via `core/api` registry → svelte-query, **cursor** pagination) feeds a **Leaflet client-only `MapView`** (Stadia raster tiles **proxied through the BFF** so `STADIA_API_KEY` stays server-side — ADR 0013). Routes: `/peta` (map home, replaces the placeholder) + `/kajian/[id]` (detail). Pins get coordinates via `/events/nearby?expand=place` — `PlaceResponse` has `lat`/`lng`. Geolocation → `region_id` fallback.
+**Architecture:** An `events` domain (typed client via `core/api` registry → svelte-query, **cursor** pagination) feeds a **Leaflet client-only `MapView`** (Stadia raster tiles **proxied through the BFF** so `STADIA_API_KEY` stays server-side — ADR 0013). Routes: `/peta` (map home, replaces the placeholder) + `/kajian/[id]` (detail). Event pins get coordinates via `/events/nearby?expand=place`; place-only pins come from `/places` with nearby filters. Geolocation denial/unavailable falls back to the default Cirebon center; full region/city picker is intentionally split into a later PR.
 
 **Locked facts (from generated types + qarib-api `docs/features/events.md`):**
 - Occurrence `EventRecurringResponse`: `id` (int64), `event_id` (uuid), `name`/`description` (L10n, nullable override), `asatidz_id`/`place_id` (nullable override), `date_start`/`date_end`, `date_prayer` (int), `status` (int), `going_count`, `distance_km` (nearby distance-mode only). With `expand=place,asatidz` the place (with `lat`/`lng`/`name`/`address`) + asatidz embed on each item — **the implementer must confirm the exact embedded field name in `src/lib/generated/upstream.ts`**.
 - **Status enum:** `Incoming=0, Ongoing=1, Cancelled=10, Rescheduled=11, Completed=99`.
-- **`/events/nearby`:** `lat`+`lng` **XOR** `region_id`; `radius_km`; `subject_id?`; `date_from?`/`date_to?`; `limit?`; `cursor?`; `expand?`. Forward-only cursor.
+- **`/events/nearby`:** `lat`+`lng` or `region_id`; `radius_km`; `subject_id?`; `date_from?`/`date_to?`; `limit?`; `cursor?`; `expand?`. Forward-only cursor. `/peta` currently uses `lat`+`lng`; region/city selection is follow-up scope.
 - **Envelope/pagination:** `{success, data, pagination:{next_cursor, prev_cursor, has_more, has_prev, total?}}` — unwrapped at `core/api`. Cursor-based; **never** offset.
 - **Time display = `HH:mm` with a colon** (`18:00`), per the Hi-Fi mockups.
 
@@ -72,14 +72,15 @@
 - Create: `src/lib/domains/events/components/event-card.svelte` (+ test), and the UI stores ported as **context-DI** (`state-management.md`): `domains/events/store.svelte.ts` (map filters + selected pin) and a `core` location service (geolocation) — port/adapt `qarib-cms` `location.svelte.ts`/`mapFilters.svelte.ts`/`nearby.svelte.ts` (NO module singletons — factory + `setContext`).
 - Modify: `messages/id.json` (+ peta UI strings; replace the `peta_soon_*` placeholder copy).
 
-- [x] Step 1 — Geolocation: a `createLocation()` context service — request permission; expose `coords | null` + `status`; on deny/unavailable → caller uses `region_id` fallback (a sensible default region or a region picker stub).
+- [x] Step 1 — Geolocation: a `createLocation()` context service — request permission; expose `coords | null` + `status`; on deny/unavailable → caller keeps the map alive on the default Cirebon center and shows a centered popup with "Pakai Cirebon" / "Coba GPS lagi".
 - [x] Step 2 — `event-card.svelte`: time (`HH:mm`) + prayer anchor (`getPrayerLabel`) + title (occurrence name → series fallback) + masjid + `distance_km` (`formatDistance`) + a status `Badge`. TDD any pure formatting.
-- [x] Step 3 — `/peta/+page.svelte`: the map (MapView) ↔ list toggle, a date strip, subject chips; bind the nearby query (lat/lng from location, else region); pin-click → bottom-sheet/callout with the occurrence + a "Buka kajian" link to `/kajian/[id]`. Map-home header (A4 home mode).
+- [x] Step 3 — `/peta/+page.svelte`: full-bleed map (MapView), floating date/tema/radius filters, nearby event query by `lat`+`lng`, nearby place query for masjid without today's event, custom date picker, radius steps `10 → 15 → 25 → 40 → 60`, pin-click → PinSheet for today events or `/tempat/[id]` for place-only pins. Map-home header (A4 home mode).
 - [x] Step 4 — e2e: with MSW stubbing `/api/upstream/events/nearby`, `/peta` renders pins + list; clicking an event navigates to `/kajian/[id]`.
 - [x] Step 5 — Gates green. Commit `feat(peta): nearby-kajian map home (map+list, filters, geolocation)`.
 - [x] Step 6 — **Post-implementation: Component z-index adjustments** — Fixed z-index layers on the Map page and its composite overlays. Updated `PinSheet`, `MapFab`, and `MapFilterChips` styling from lower values (`15` / `20`) to `999` to display them on top of Leaflet map tiles (which default to layer index of 400). Updated related overlays/loading states/empty/error templates and the scrim button to `999`/`998` values accordingly.
+- [x] Step 7 — **Post-implementation: Edge-case UX reconciliation** — Centered location/error/empty popups over the live map; replaced native custom-date input with a local-calendar month-grid picker; added radius config sheet and capped radius at 60 km; merged `/places` nearby results into neutral place-only pins so masjid without today's kajian still appear without claiming a proven future event; deduped future-place summary counts by `event_id` so repeated occurrences do not inflate "kajian" counts.
 
-**Exit:** a visitor opens `/peta`, sees nearby kajian as pins + a list, filters by date/tema, and opens a kajian — public, SSR shell + client map island.
+**Exit:** a visitor opens `/peta`, sees nearby kajian and masjid pins, filters by date/tema/radius, and opens a kajian or tempat — public, SSR shell + client map island.
 
 ---
 
