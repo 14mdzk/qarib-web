@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import {
 	formatDate,
 	formatTime,
@@ -11,6 +11,12 @@ import {
 	addIsoDateDays,
 	formatIsoDate
 } from './date.js';
+
+const ORIGINAL_TZ = process.env.TZ;
+
+afterEach(() => {
+	process.env.TZ = ORIGINAL_TZ;
+});
 
 describe('formatDistance', () => {
 	it('formats sub-kilometre distances in metres', () => {
@@ -50,17 +56,30 @@ describe('formatTime', () => {
 });
 
 describe('toDateRange', () => {
-	it('always returns the Asia/Jakarta day range regardless of host timezone', () => {
+	it('uses browser-local wall times and offset in Asia/Jakarta', () => {
+		process.env.TZ = 'Asia/Jakarta';
 		const { date_from, date_to } = toDateRange('2026-05-15');
 		expect(date_from).toBe('2026-05-15T00:00:00+07:00');
 		expect(date_to).toBe('2026-05-15T23:59:59+07:00');
 	});
+
+	it('uses separate offsets across an America/New_York DST transition day', () => {
+		process.env.TZ = 'America/New_York';
+		const { date_from, date_to } = toDateRange('2026-03-08');
+		expect(date_from).toBe('2026-03-08T00:00:00-05:00');
+		expect(date_to).toBe('2026-03-08T23:59:59-04:00');
+	});
 });
 
 describe('toLocalIsoDate', () => {
-	it('returns the Asia/Jakarta-visible date when UTC is still on the previous day', () => {
-		const jakartaJuneFirst = new Date('2026-05-31T17:30:00Z');
-		expect(toLocalIsoDate(jakartaJuneFirst)).toBe('2026-06-01');
+	it('uses current runtime local calendar date without named timezone', () => {
+		const instant = new Date('2026-05-31T17:30:00Z');
+
+		process.env.TZ = 'Asia/Jakarta';
+		expect(toLocalIsoDate(instant)).toBe('2026-06-01');
+
+		process.env.TZ = 'America/New_York';
+		expect(toLocalIsoDate(instant)).toBe('2026-05-31');
 	});
 });
 
@@ -77,7 +96,8 @@ describe('addIsoDateDays', () => {
 });
 
 describe('formatIsoDate', () => {
-	it('formats the requested calendar date in Asia/Jakarta', () => {
+	it('formats the same calendar date across runtime timezones', () => {
+		process.env.TZ = 'America/New_York';
 		expect(
 			formatIsoDate('2026-06-01', {
 				weekday: 'long',

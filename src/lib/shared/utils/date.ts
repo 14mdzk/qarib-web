@@ -1,13 +1,11 @@
 import { m } from '$core/i18n';
 
-export const QARIB_TIME_ZONE = 'Asia/Jakarta';
-const QARIB_UTC_OFFSET = '+07:00';
-
-function isoFromUtcDate(date: Date): string {
-	const year = date.getUTCFullYear();
-	const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-	const day = String(date.getUTCDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
+function toOffsetString(date: Date): string {
+	const offsetMinutes = -date.getTimezoneOffset();
+	const sign = offsetMinutes >= 0 ? '+' : '-';
+	const hours = String(Math.floor(Math.abs(offsetMinutes) / 60)).padStart(2, '0');
+	const minutes = String(Math.abs(offsetMinutes) % 60).padStart(2, '0');
+	return `${sign}${hours}:${minutes}`;
 }
 
 function isoDateParts(dateStr: string): [year: number, month: number, day: number] {
@@ -39,26 +37,24 @@ export function formatDistance(km: number): string {
 }
 
 export function toLocalIsoDate(date: Date): string {
-	const parts = new Intl.DateTimeFormat('en-US', {
-		timeZone: QARIB_TIME_ZONE,
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	}).formatToParts(date);
-	const year = parts.find((part) => part.type === 'year')?.value ?? '';
-	const month = parts.find((part) => part.type === 'month')?.value ?? '';
-	const day = parts.find((part) => part.type === 'day')?.value ?? '';
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
 	return `${year}-${month}-${day}`;
 }
 
 export function addIsoDateDays(dateStr: string, days: number): string {
 	const [year, month, day] = isoDateParts(dateStr);
-	return isoFromUtcDate(new Date(Date.UTC(year, month - 1, day + days, 12)));
+	const date = new Date(year, month - 1, day, 12);
+	date.setDate(date.getDate() + days);
+	return toLocalIsoDate(date);
 }
 
 export function shiftCalendarMonth(dateStr: string, delta: number): string {
 	const [year, month] = isoDateParts(dateStr);
-	return isoFromUtcDate(new Date(Date.UTC(year, month - 1 + delta, 1, 12)));
+	const date = new Date(year, month - 1, 1, 12);
+	date.setMonth(date.getMonth() + delta);
+	return toLocalIsoDate(date);
 }
 
 export function formatIsoDate(
@@ -66,10 +62,8 @@ export function formatIsoDate(
 	options: Intl.DateTimeFormatOptions,
 	locale = 'id-ID'
 ): string {
-	return new Intl.DateTimeFormat(locale, {
-		...options,
-		timeZone: QARIB_TIME_ZONE
-	}).format(new Date(`${dateStr}T12:00:00Z`));
+	const [year, month, day] = isoDateParts(dateStr);
+	return new Intl.DateTimeFormat(locale, options).format(new Date(year, month - 1, day, 12));
 }
 
 export function getWeekdayLabels(locale = 'id-ID'): string[] {
@@ -82,9 +76,12 @@ export function getWeekdayLabels(locale = 'id-ID'): string[] {
 }
 
 export function toDateRange(dateStr: string): { date_from: string; date_to: string } {
+	const [year, month, day] = isoDateParts(dateStr);
+	const start = new Date(year, month - 1, day, 0, 0, 0);
+	const end = new Date(year, month - 1, day, 23, 59, 59);
 	return {
-		date_from: `${dateStr}T00:00:00${QARIB_UTC_OFFSET}`,
-		date_to: `${dateStr}T23:59:59${QARIB_UTC_OFFSET}`
+		date_from: `${dateStr}T00:00:00${toOffsetString(start)}`,
+		date_to: `${dateStr}T23:59:59${toOffsetString(end)}`
 	};
 }
 

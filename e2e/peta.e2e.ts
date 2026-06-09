@@ -471,3 +471,22 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(sheet).not.toBeVisible({ timeout: 3_000 });
 	});
 });
+
+test.describe('/peta — browser-local date bounds', () => {
+	test.use({ timezoneId: 'America/New_York' });
+
+	test('uses separate local offsets across DST transition day', async ({ page }) => {
+		await useCirebonGeolocation(page);
+		await page.clock.setFixedTime(new Date('2026-03-08T12:00:00-04:00'));
+		const request = waitForNearbyRequest(
+			page,
+			(params) =>
+				params.get('date_from') === '2026-03-08T00:00:00-05:00' &&
+				params.get('date_to') === '2026-03-08T23:59:59-04:00'
+		);
+
+		await page.goto('/peta');
+
+		expect((await request).get('date_from')).toBe('2026-03-08T00:00:00-05:00');
+	});
+});

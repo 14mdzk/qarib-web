@@ -20,10 +20,9 @@
 		toDateRange,
 		toLocalIsoDate
 	} from '$lib/shared/utils/date.js';
-	import { createLocation, DEFAULT_CENTER } from '$core/location/index.svelte.js';
+	import { createLocation } from '$core/location/index.svelte.js';
 	import {
 		createEventsView,
-		DEFAULT_RADIUS_KM,
 		MAX_RADIUS_KM,
 		RADIUS_STEPS_KM
 	} from '$domains/events/store.svelte.js';
@@ -36,14 +35,8 @@
 		groupOccurrencesToPlacePins,
 		mergeNearbyPlacesWithEventPins
 	} from '$domains/events/place-pins.js';
-	import type { Paginated } from '$core/api';
-	import type {
-		EventRecurringResponse,
-		EventRecurringResponseWithPlace
-	} from '$domains/events/schema.js';
+	import type { EventRecurringResponseWithPlace } from '$domains/events/schema.js';
 	import type { SubjectResponse } from '$domains/subject/schema.js';
-	import type { InfiniteData } from '@tanstack/svelte-query';
-	import type { PageData } from './$types';
 	import {
 		CalendarDays,
 		ChevronLeft,
@@ -56,28 +49,26 @@
 	} from '@lucide/svelte';
 	import { l10n } from '$shared/utils/l10n';
 
-	let { data }: { data: PageData } = $props();
-
 	// ---------------------------------------------------------------------------
 	// Context-DI: instantiate location + view stores at page scope
 	// ---------------------------------------------------------------------------
 
 	const location = createLocation();
 	const eventsView = createEventsView();
-	const todayIso = toLocalIsoDate(new Date());
+	let todayIso = $state<string | null>(null);
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
 	let customDatePickerOpen = $state(false);
-	let calendarMonth = $state(`${todayIso.slice(0, 7)}-01`);
+	let calendarMonth = $state<string | null>(null);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
 	// ---------------------------------------------------------------------------
 
-	function buildDateStrip(): { label: string; iso: string }[] {
+	function buildDateStrip(today: string): { label: string; iso: string }[] {
 		const days: { label: string; iso: string }[] = [];
 		for (let i = 0; i < 7; i++) {
-			const iso = addIsoDateDays(todayIso, i);
+			const iso = addIsoDateDays(today, i);
 			const label =
 				i === 0 ? m.peta_date_today() : formatIsoDate(iso, { weekday: 'short', day: 'numeric' });
 			days.push({ label, iso });
@@ -85,16 +76,16 @@
 		return days;
 	}
 
-	const dateStrip = buildDateStrip();
+	const dateStrip = $derived(todayIso ? buildDateStrip(todayIso) : []);
 
-	function addDaysIso(days: number): string {
-		return addIsoDateDays(todayIso, days);
+	function addDaysIso(days: number): string | null {
+		return todayIso ? addIsoDateDays(todayIso, days) : null;
 	}
 
 	const tomorrowIso = $derived(dateStrip[1]?.iso ?? addDaysIso(1));
 
-	function formatDateChip(iso: string): string {
-		if (iso === dateStrip[0].iso) return m.peta_filter_date_today();
+	function formatDateChip(iso: string | null): string {
+		if (!iso || iso === dateStrip[0]?.iso) return m.peta_filter_date_today();
 		if (iso === tomorrowIso) return m.peta_filter_date_tomorrow();
 		return formatIsoDate(iso, { day: 'numeric', month: 'short' });
 	}
@@ -113,7 +104,8 @@
 		label: string;
 		inMonth: boolean;
 	}> {
-		const firstWeekday = new Date(`${monthDate}T12:00:00Z`).getUTCDay();
+		const [year, month] = monthDate.split('-').map(Number);
+		const firstWeekday = new Date(year, month - 1, 1, 12).getDay();
 		const start = addIsoDateDays(monthDate, -firstWeekday);
 		const days: Array<{ iso: string; label: string; inMonth: boolean }> = [];
 		for (let i = 0; i < 42; i++) {
@@ -127,9 +119,11 @@
 		return days;
 	}
 
-	function futureRange(): { date_from: string; date_to: string } {
+	function futureRange(): { date_from: string; date_to: string } | null {
+		if (!tomorrowIso) return null;
 		const start = toDateRange(tomorrowIso);
-		const end = toDateRange(addDaysIso(14));
+		const futureEnd = addDaysIso(14);
+		const end = toDateRange(futureEnd ?? tomorrowIso);
 		return { date_from: start.date_from, date_to: end.date_to };
 	}
 
@@ -138,60 +132,35 @@
 	}
 
 	function previousMonth(): void {
-		calendarMonth = shiftCalendarMonth(calendarMonth, -1);
+		if (calendarMonth) calendarMonth = shiftCalendarMonth(calendarMonth, -1);
 	}
 
 	function nextMonth(): void {
-		calendarMonth = shiftCalendarMonth(calendarMonth, 1);
-	}
-
-	const DEFAULT_CENTER_TOLERANCE = 0.0001;
-
-	function isDefaultCenter(center: { lat: number; lng: number }): boolean {
-		return (
-			Math.abs(center.lat - DEFAULT_CENTER.lat) <= DEFAULT_CENTER_TOLERANCE &&
-			Math.abs(center.lng - DEFAULT_CENTER.lng) <= DEFAULT_CENTER_TOLERANCE
-		);
+		if (calendarMonth) calendarMonth = shiftCalendarMonth(calendarMonth, 1);
 	}
 
 	// ---------------------------------------------------------------------------
 	// Svelte-query: cursor-paginated nearby feed (state-management.md rule)
 	// ---------------------------------------------------------------------------
 
-	const activeDay = $derived(eventsView.selectedDate ?? dateStrip[0].iso);
-	const dateRange = $derived(toDateRange(activeDay));
+	const activeDay = $derived(eventsView.selectedDate ?? todayIso);
+	const dateRange = $derived(activeDay ? toDateRange(activeDay) : null);
+	const dateReady = $derived(activeDay != null && dateRange != null);
 
 	const queryArgs = $derived({
 		lat: location.center.lat,
 		lng: location.center.lng,
 		radius_km: eventsView.selectedRadiusKm,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: dateRange.date_from,
-		date_to: dateRange.date_to,
+		date_from: dateRange?.date_from,
+		date_to: dateRange?.date_to,
 		expand: 'place',
 		limit: 10
 	});
 
-	const initialDataStillMatches = $derived(
-		location.mode === 'default' &&
-			isDefaultCenter(location.center) &&
-			activeDay === dateStrip[0].iso &&
-			eventsView.selectedRadiusKm === DEFAULT_RADIUS_KM &&
-			eventsView.selectedSubjectId == null
-	);
-
-	// SSR seed
-	const _initData = $derived(data.initialData as Paginated<EventRecurringResponse[]> | null);
-
 	const query = defineNearbyInfiniteQuery(() => ({
 		args: queryArgs,
-		initialData:
-			_initData && initialDataStillMatches
-				? ({
-						pages: [_initData],
-						pageParams: [null]
-					} satisfies InfiniteData<Paginated<EventRecurringResponse[]>, string | null>)
-				: undefined
+		enabled: dateReady
 	}));
 
 	// Derived flat list from all pages.
@@ -230,12 +199,14 @@
 		lng: location.center.lng,
 		radius_km: MAX_RADIUS_KM,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: fallbackDateRange.date_from,
-		date_to: fallbackDateRange.date_to,
+		date_from: fallbackDateRange?.date_from,
+		date_to: fallbackDateRange?.date_to,
 		expand: 'place',
 		limit: 30
 	});
-	const fallbackEnabled = $derived(query.isSuccess && events.length === 0 && !showLocationNotice);
+	const fallbackEnabled = $derived(
+		dateReady && query.isSuccess && events.length === 0 && !showLocationNotice
+	);
 	const fallbackQuery = defineNearbyInfiniteQuery(() => ({
 		args: fallbackArgs,
 		enabled: fallbackEnabled
@@ -359,7 +330,7 @@
 
 	const queryContextKey = $derived(
 		[
-			activeDay,
+			activeDay ?? '',
 			eventsView.selectedRadiusKm,
 			eventsView.selectedSubjectId ?? '',
 			location.center.lat.toFixed(5),
@@ -429,9 +400,9 @@
 	}
 
 	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
-	const calendarDays = $derived(buildCalendarGrid(calendarMonth));
+	const calendarDays = $derived(calendarMonth ? buildCalendarGrid(calendarMonth) : []);
 	const calendarMonthLabel = $derived(
-		formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' })
+		calendarMonth ? formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' }) : ''
 	);
 	const weekdayLabels = getWeekdayLabels('id-ID');
 
@@ -442,6 +413,9 @@
 	const GHOST_PIN_DELAYS = ['0s', '0.3s', '0.6s', '0.9s', '1.2s'];
 
 	onMount(() => {
+		const localToday = toLocalIsoDate(new Date());
+		todayIso = localToday;
+		calendarMonth = `${localToday.slice(0, 7)}-01`;
 		// requestGps() updates location.center on success → queryArgs changes →
 		// createInfiniteQuery re-fetches automatically (new queryKey).
 		location.requestGps();
@@ -655,7 +629,7 @@
 				<span>{m.peta_date_sheet_title()}</span>
 			</div>
 			<div class="filter-sheet__options">
-				<button class:active={activeDay === dateStrip[0].iso} onclick={() => chooseDate(null)}>
+				<button class:active={activeDay === dateStrip[0]?.iso} onclick={() => chooseDate(null)}>
 					{m.peta_filter_date_today()}
 				</button>
 				<button class:active={activeDay === tomorrowIso} onclick={() => chooseDate(tomorrowIso)}>
