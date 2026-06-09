@@ -7,7 +7,9 @@ import {
 	getRelativeDateLabel,
 	toLocalIsoDate,
 	shiftCalendarMonth,
-	getWeekdayLabels
+	getWeekdayLabels,
+	addIsoDateDays,
+	formatIsoDate
 } from './date.js';
 
 describe('formatDistance', () => {
@@ -48,30 +50,42 @@ describe('formatTime', () => {
 });
 
 describe('toDateRange', () => {
-	it('returns a day range from T00:00:00 to T23:59:59 with a ±HH:MM tz suffix', () => {
+	it('always returns the Asia/Jakarta day range regardless of host timezone', () => {
 		const { date_from, date_to } = toDateRange('2026-05-15');
-		expect(date_from).toMatch(/^2026-05-15T00:00:00[+-]\d{2}:\d{2}$/);
-		expect(date_to).toMatch(/^2026-05-15T23:59:59[+-]\d{2}:\d{2}$/);
-	});
-
-	it('preserves the date string verbatim', () => {
-		const { date_from, date_to } = toDateRange('2026-05-15');
-		expect(date_from.startsWith('2026-05-15')).toBe(true);
-		expect(date_to.startsWith('2026-05-15')).toBe(true);
+		expect(date_from).toBe('2026-05-15T00:00:00+07:00');
+		expect(date_to).toBe('2026-05-15T23:59:59+07:00');
 	});
 });
 
 describe('toLocalIsoDate', () => {
-	it('preserves the visible local calendar day instead of converting through UTC', () => {
-		const localJuneFirst = new Date(2026, 5, 1, 0, 30);
-		expect(toLocalIsoDate(localJuneFirst)).toBe('2026-06-01');
+	it('returns the Asia/Jakarta-visible date when UTC is still on the previous day', () => {
+		const jakartaJuneFirst = new Date('2026-05-31T17:30:00Z');
+		expect(toLocalIsoDate(jakartaJuneFirst)).toBe('2026-06-01');
 	});
 });
 
 describe('shiftCalendarMonth', () => {
 	it('normalizes to day one before moving from January 31 to February', () => {
-		const result = shiftCalendarMonth(new Date(2026, 0, 31, 12), 1);
-		expect(toLocalIsoDate(result)).toBe('2026-02-01');
+		expect(shiftCalendarMonth('2026-01-31', 1)).toBe('2026-02-01');
+	});
+});
+
+describe('addIsoDateDays', () => {
+	it('adds calendar days without host timezone conversion', () => {
+		expect(addIsoDateDays('2026-05-31', 1)).toBe('2026-06-01');
+	});
+});
+
+describe('formatIsoDate', () => {
+	it('formats the requested calendar date in Asia/Jakarta', () => {
+		expect(
+			formatIsoDate('2026-06-01', {
+				weekday: 'long',
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			})
+		).toBe('Senin, 1 Juni 2026');
 	});
 });
 

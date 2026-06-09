@@ -11,7 +11,9 @@
 	import type { FilterChip } from '$lib/shared/composites/map-filter-chips.svelte';
 	import MapFab from '$lib/shared/composites/map-fab.svelte';
 	import {
+		addIsoDateDays,
 		formatDistance,
+		formatIsoDate,
 		formatTime,
 		getWeekdayLabels,
 		shiftCalendarMonth,
@@ -62,10 +64,11 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
+	const todayIso = toLocalIsoDate(new Date());
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
 	let customDatePickerOpen = $state(false);
-	let calendarMonth = $state(new Date());
+	let calendarMonth = $state(`${todayIso.slice(0, 7)}-01`);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
@@ -73,16 +76,10 @@
 
 	function buildDateStrip(): { label: string; iso: string }[] {
 		const days: { label: string; iso: string }[] = [];
-		const now = new Date();
 		for (let i = 0; i < 7; i++) {
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- static non-reactive computation
-			const d = new Date(now);
-			d.setDate(d.getDate() + i);
-			const iso = toLocalIsoDate(d);
+			const iso = addIsoDateDays(todayIso, i);
 			const label =
-				i === 0
-					? m.peta_date_today()
-					: new Intl.DateTimeFormat('id-ID', { weekday: 'short', day: 'numeric' }).format(d);
+				i === 0 ? m.peta_date_today() : formatIsoDate(iso, { weekday: 'short', day: 'numeric' });
 			days.push({ label, iso });
 		}
 		return days;
@@ -91,10 +88,7 @@
 	const dateStrip = buildDateStrip();
 
 	function addDaysIso(days: number): string {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- pure date arithmetic helper, not component state.
-		const d = new Date();
-		d.setDate(d.getDate() + days);
-		return toLocalIsoDate(d);
+		return addIsoDateDays(todayIso, days);
 	}
 
 	const tomorrowIso = $derived(dateStrip[1]?.iso ?? addDaysIso(1));
@@ -102,39 +96,32 @@
 	function formatDateChip(iso: string): string {
 		if (iso === dateStrip[0].iso) return m.peta_filter_date_today();
 		if (iso === tomorrowIso) return m.peta_filter_date_tomorrow();
-		return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short' }).format(
-			new Date(`${iso}T00:00:00`)
-		);
+		return formatIsoDate(iso, { day: 'numeric', month: 'short' });
 	}
 
 	function formatFullDate(iso: string): string {
-		return new Intl.DateTimeFormat('id-ID', {
+		return formatIsoDate(iso, {
 			weekday: 'long',
 			day: 'numeric',
 			month: 'long',
 			year: 'numeric'
-		}).format(new Date(`${iso}T00:00:00`));
+		});
 	}
 
-	function buildCalendarGrid(monthDate: Date): Array<{
+	function buildCalendarGrid(monthDate: string): Array<{
 		iso: string;
 		label: string;
 		inMonth: boolean;
 	}> {
-		const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- pure calendar grid math, not component state.
-		const start = new Date(first);
-		start.setDate(first.getDate() - first.getDay());
+		const firstWeekday = new Date(`${monthDate}T12:00:00Z`).getUTCDay();
+		const start = addIsoDateDays(monthDate, -firstWeekday);
 		const days: Array<{ iso: string; label: string; inMonth: boolean }> = [];
 		for (let i = 0; i < 42; i++) {
-			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- pure calendar grid math, not component state.
-			const date = new Date(start);
-			date.setDate(start.getDate() + i);
-			const iso = toLocalIsoDate(date);
+			const iso = addIsoDateDays(start, i);
 			days.push({
 				iso,
-				label: new Intl.DateTimeFormat('id-ID', { day: 'numeric' }).format(date),
-				inMonth: date.getMonth() === monthDate.getMonth()
+				label: formatIsoDate(iso, { day: 'numeric' }),
+				inMonth: iso.slice(0, 7) === monthDate.slice(0, 7)
 			});
 		}
 		return days;
@@ -444,7 +431,7 @@
 	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
 	const calendarDays = $derived(buildCalendarGrid(calendarMonth));
 	const calendarMonthLabel = $derived(
-		new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(calendarMonth)
+		formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' })
 	);
 	const weekdayLabels = getWeekdayLabels('id-ID');
 
@@ -760,7 +747,7 @@
 						class:active={eventsView.selectedRadiusKm === radius}
 						onclick={() => selectRadius(radius)}
 					>
-						{radius} km
+						{m.peta_filter_radius_label({ value: radius })}
 					</button>
 				{/each}
 			</div>

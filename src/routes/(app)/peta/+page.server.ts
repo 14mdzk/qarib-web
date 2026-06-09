@@ -18,10 +18,10 @@ import type { PageServerLoad } from './$types';
 import { api } from '$core/api';
 import { DEFAULT_CENTER } from '$core/location/index.svelte.js';
 import { DEFAULT_RADIUS_KM } from '$domains/events/store.svelte.js';
-import { toDateRange } from '$lib/shared/utils/date.js';
+import { toDateRange, toLocalIsoDate } from '$lib/shared/utils/date.js';
 
 export const load: PageServerLoad = async ({ fetch }) => {
-	const today = new Date().toISOString().slice(0, 10);
+	const today = toLocalIsoDate(new Date());
 	const { date_from, date_to } = toDateRange(today);
 
 	try {

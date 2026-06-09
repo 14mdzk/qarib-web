@@ -6,11 +6,16 @@
  *
  * Conformance: rule .claude/rules/testing.md
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { QueryClient } from '@tanstack/svelte-query';
-import { placeKeys, definePlaceByIdQuery, definePlaceListQuery } from './queries.js';
+import {
+	createPlaceListQueryOptions,
+	placeKeys,
+	definePlaceByIdQuery,
+	definePlaceListQuery
+} from './queries.js';
 
 function buildQc() {
 	return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -30,6 +35,10 @@ function makePlace(overrides: Record<string, unknown> = {}) {
 		...overrides
 	};
 }
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 // ---------------------------------------------------------------------------
 // placeKeys — query key factory
@@ -112,5 +121,52 @@ describe('definePlaceByIdQuery options shape', () => {
 		expect(() =>
 			definePlaceListQuery({ near_lat: -6.732, near_lng: 108.5523, radius_km: 25 }, {}, qc)
 		).not.toThrow();
+	});
+
+	it('captures one reactive args value for both query key and request', async () => {
+		let argsCalls = 0;
+		const fetchMock = vi.fn(async () =>
+			Response.json({
+				success: true,
+				data: [],
+				pagination: {
+					next_cursor: null,
+					prev_cursor: null,
+					has_more: false,
+					has_prev: false,
+					total: 0
+				}
+			})
+		);
+		vi.stubGlobal('window', {});
+		vi.stubGlobal('fetch', fetchMock);
+
+		const options = createPlaceListQueryOptions(() => {
+			argsCalls += 1;
+			return {
+				near_lat: -6.732,
+				near_lng: 108.5523,
+				radius_km: argsCalls === 1 ? 10 : 60
+			};
+		}, {});
+
+		expect(argsCalls).toBe(1);
+		expect(options.queryKey).toEqual([
+			'places',
+			'list',
+			{ near_lat: -6.732, near_lng: 108.5523, radius_km: 10 }
+		]);
+		if (typeof options.queryFn !== 'function') {
+			throw new Error('Expected places list query function');
+		}
+		await options.queryFn({
+			signal: new AbortController().signal
+		});
+
+		expect(argsCalls).toBe(1);
+		expect(fetchMock).toHaveBeenCalledWith(
+			expect.stringContaining('radius_km=10'),
+			expect.any(Object)
+		);
 	});
 });

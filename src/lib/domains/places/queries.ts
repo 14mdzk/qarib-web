@@ -30,37 +30,47 @@ export const placeKeys = {
 	get: (id: string, expand?: string) => ['places', 'get', id, expand] as const
 } as const;
 
+interface PlaceListQueryOptions {
+	enabled?: boolean | (() => boolean);
+	staleTime?: number;
+	requestId?: string;
+	initialData?: Paginated<PlaceResponse[]>;
+}
+
 // ---------------------------------------------------------------------------
 // Place list query
 // ---------------------------------------------------------------------------
+
+export function createPlaceListQueryOptions(
+	args: ListPlacesArgs | (() => ListPlacesArgs),
+	opts?: PlaceListQueryOptions
+) {
+	const resolvedArgs = typeof args === 'function' ? args() : args;
+	return {
+		queryKey: placeKeys.list(resolvedArgs),
+		queryFn: ({ signal }: { signal: AbortSignal }) =>
+			api('places.list', resolvedArgs, undefined, {
+				signal,
+				requestId: opts?.requestId,
+				baseUrl: ''
+			}) as Promise<Paginated<PlaceResponse[]>>,
+		enabled: typeof opts?.enabled === 'function' ? opts.enabled() : opts?.enabled,
+		staleTime: opts?.staleTime,
+		initialData: opts?.initialData,
+		initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+	};
+}
 
 /**
  * Reactive place-list query.
  */
 export function definePlaceListQuery(
 	args: ListPlacesArgs | (() => ListPlacesArgs),
-	opts?: {
-		enabled?: boolean | (() => boolean);
-		staleTime?: number;
-		requestId?: string;
-		initialData?: Paginated<PlaceResponse[]>;
-	},
+	opts?: PlaceListQueryOptions,
 	queryClient?: QueryClient
 ) {
 	return createQuery<Paginated<PlaceResponse[]>>(
-		() => ({
-			queryKey: placeKeys.list(typeof args === 'function' ? args() : args),
-			queryFn: ({ signal }: { signal: AbortSignal }) =>
-				api('places.list', typeof args === 'function' ? args() : args, undefined, {
-					signal,
-					requestId: opts?.requestId,
-					baseUrl: ''
-				}) as Promise<Paginated<PlaceResponse[]>>,
-			enabled: typeof opts?.enabled === 'function' ? opts.enabled() : opts?.enabled,
-			staleTime: opts?.staleTime,
-			initialData: opts?.initialData,
-			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
-		}),
+		() => createPlaceListQueryOptions(args, opts),
 		queryClient ? () => queryClient : undefined
 	);
 }
