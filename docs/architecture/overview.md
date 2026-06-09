@@ -78,8 +78,12 @@ server credentials. It also never calls the qarib-api runtime directly.
 ## Route Model
 
 - `src/routes/(marketing)/` owns `/`, the public landing page.
-- `src/routes/(app)/` owns public browse pages. There is no v1 login flow and
-  no end-user session gate around this group.
+- `src/routes/(app)/` owns public browse pages gated behind a location
+  completion marker (`qarib_location_complete=v1` cookie). Without the marker,
+  requests receive a 303 redirect to `/lokasi?returnTo=...`. The gate is a
+  privacy-preserving completion check — it never receives or stores coordinates
+  or region identifiers. There is no v1 login flow and no end-user session gate.
+- `src/routes/lokasi/` is an ungated onboarding route outside `(app)`.
 - `src/routes/api/upstream/[...path]/+server.ts` owns the qarib-api runtime
   read-through BFF.
 - `src/routes/api/tiles/[...tile]/+server.ts` owns map tile proxying.
@@ -88,8 +92,12 @@ server credentials. It also never calls the qarib-api runtime directly.
 
 - **Server state**: data fetched from qarib-api runtime, owned by svelte-query
   via `core/query`.
-- **UI state**: filters, selected pins, sheets, and location preference, owned
-  by context-scoped domain stores.
+- **UI state**: filters, selected pins, sheets, owned by context-scoped domain stores.
+- **Location preference**: versioned, Zod-validated client-side record in
+  `localStorage` (GPS coordinates or manual province/city). Managed by
+  `core/location/preference.svelte.ts`. A separate completion marker cookie
+  (`qarib_location_complete=v1`) signals schema completion to the server gate
+  without exposing coordinates or region identifiers.
 - **Locale state**: Bahasa-only v1 (`id`) via Paraglide and root layout data.
 - **No v1 session state**: no login, signup, favorites, follows, or per-user
   authorization branch exists in the current architecture.
