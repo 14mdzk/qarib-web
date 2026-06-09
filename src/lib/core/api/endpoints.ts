@@ -447,6 +447,34 @@ export const Endpoints = {
 	>({
 		method: 'GET',
 		path: (a) => `/api/upstream/subjects/${encodeURIComponent(a.id)}${qs({ expand: a.expand })}`
+	}),
+
+	// -------------------------------------------------------------------
+	// Regions domain
+	// -------------------------------------------------------------------
+
+	/**
+	 * List administrative regions, cursor-paginated.
+	 *
+	 * Use `limit=100` and follow `next_cursor` to accumulate full pages.
+	 * Filter by `parent` to fetch children of a province.
+	 */
+	'regions.list': defineEndpoint<
+		{ cursor?: string; limit?: number; search?: string; parent?: string },
+		void,
+		Paginated<components['schemas']['RegionResponse'][]>
+	>({
+		method: 'GET',
+		path: (a) =>
+			`/api/upstream/regions${qs({ cursor: a.cursor, limit: a.limit, search: a.search, parent: a.parent })}`
+	}),
+
+	/**
+	 * Single region by ID (string, not necessarily a UUID).
+	 */
+	'regions.get': defineEndpoint<{ id: string }, void, DataOf<Get200<'/regions/{id}', 'get'>>>({
+		method: 'GET',
+		path: (a) => `/api/upstream/regions/${encodeURIComponent(a.id)}`
 	})
 } as const;
 

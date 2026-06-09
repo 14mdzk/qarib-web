@@ -149,8 +149,8 @@
 	const dateReady = $derived(activeDay != null && dateRange != null);
 
 	const queryArgs = $derived({
-		lat: location.center.lat,
-		lng: location.center.lng,
+		lat: location.center?.lat,
+		lng: location.center?.lng,
 		radius_km: eventsView.selectedRadiusKm,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
 		date_from: dateRange?.date_from,
@@ -168,8 +168,8 @@
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
 
 	const nearbyPlaceArgs = $derived({
-		near_lat: location.center.lat,
-		near_lng: location.center.lng,
+		near_lat: location.center?.lat,
+		near_lng: location.center?.lng,
 		radius_km: eventsView.selectedRadiusKm,
 		is_active: true,
 		limit: 30
@@ -196,8 +196,8 @@
 
 	const fallbackDateRange = $derived(futureRange());
 	const fallbackArgs = $derived({
-		lat: location.center.lat,
-		lng: location.center.lng,
+		lat: location.center?.lat,
+		lng: location.center?.lng,
 		radius_km: MAX_RADIUS_KM,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
 		date_from: fallbackDateRange?.date_from,
@@ -239,9 +239,12 @@
 	);
 
 	// Map center + userLocation derived from location store.
-	const mapCenter = $derived<[number, number]>([location.center.lat, location.center.lng]);
+	const mapCenter = $derived<[number, number]>([
+		location.center?.lat ?? -6.732,
+		location.center?.lng ?? 108.5523
+	]);
 	const userLocation = $derived<[number, number] | undefined>(
-		location.granted ? [location.center.lat, location.center.lng] : undefined
+		location.granted && location.center ? [location.center.lat, location.center.lng] : undefined
 	);
 
 	// ---------------------------------------------------------------------------
@@ -336,8 +339,8 @@
 			activeDay ?? '',
 			eventsView.selectedRadiusKm,
 			eventsView.selectedSubjectId ?? '',
-			location.center.lat.toFixed(5),
-			location.center.lng.toFixed(5)
+			(location.center?.lat ?? 0).toFixed(5),
+			(location.center?.lng ?? 0).toFixed(5)
 		].join('|')
 	);
 
@@ -533,7 +536,7 @@
 				<button
 					class="edge-sheet__button edge-sheet__button--primary"
 					onclick={() => {
-						location.useDefaultCenter();
+						// GPS denied — no default fallback (plan: first-run flow §6)
 						locationNoticeDismissed = true;
 					}}
 				>

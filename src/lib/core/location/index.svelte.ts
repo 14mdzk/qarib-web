@@ -2,24 +2,40 @@
  * Geolocation service — context-DI factory.
  *
  * Provides a `createLocation()` factory + `getLocation()` reader pair. The
- * service manages a center coordinate (default Cirebon, the pilot region),
- * geolocation permission state, and optional `localStorage` persistence of
- * the last known center.
+ * service manages the runtime GPS permission request; persisted location
+ * preferences are handled by the co-located `LocationPreferenceService`
+ * (preference.ts).
+ *
+ * On GPS denial or unavailability this service sets the permission state
+ * and does NOT silently select a default region.  The consumer (onboarding
+ * page) is responsible for guiding the visitor toward a manual choice.
  *
  * Conformance:
  *   - rule .claude/rules/state-management.md  (factory + getter, Symbol key, no singleton)
  *   - ADR docs/decisions/0001-svelte5-context-di.md
+ *   - docs/plans/location-onboarding-settings.md § "First-run flow"
  */
 import { getContext, setContext } from 'svelte';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Re-exports — versioned preference & return-to normalisation
 // ---------------------------------------------------------------------------
 
-/** Default center: Cirebon, West Java — the pilot region. */
-export const DEFAULT_CENTER = { lat: -6.732, lng: 108.5523 } as const;
+export {
+	createLocationPreference,
+	getLocationPreference,
+	type LocationPreference,
+	type GpsPreference,
+	type ManualPreference,
+	type StagedChoice,
+	type Coordinates,
+	type RegionRef,
+	type GpsRadius,
+	GPS_RADIUS_VALUES,
+	LOCATION_PREFERENCE_KEY
+} from './preference.svelte.js';
 
-const STORAGE_KEY = 'qarib:location:center';
+export { normaliseReturnTo, DEFAULT_RETURN_TO } from './return-to.js';
 
 // ---------------------------------------------------------------------------
 // Context key (module-local — never exported)
@@ -43,8 +59,7 @@ export type LocationPermissionState = 'idle' | 'requesting' | 'granted' | 'denie
 // ---------------------------------------------------------------------------
 
 export class LocationService {
-	center = $state<{ lat: number; lng: number }>({ ...DEFAULT_CENTER });
-	mode = $state<'gps' | 'default'>('default');
+	center = $state<{ lat: number; lng: number } | null>(null);
 	granted = $state(false);
 	requesting = $state(false);
 	permission = $state<LocationPermissionState>('idle');
@@ -52,7 +67,6 @@ export class LocationService {
 	private readonly _getPosition: GetPositionFn;
 
 	constructor(getPosition?: GetPositionFn) {
-		// Inject a custom getPosition for tests; fall back to the browser API.
 		this._getPosition =
 			getPosition ??
 			((success, error) => {
@@ -62,11 +76,9 @@ export class LocationService {
 					error({ message: 'Geolocation is not available' });
 				}
 			});
-
-		this._hydrateFromStorage();
 	}
 
-	/** Request GPS permission. On success, updates center + mode. On failure, keeps the default. */
+	/** Request GPS permission. On success updates center. On denial does NOT silently select a default. */
 	requestGps(): void {
 		if (this.requesting) return;
 
@@ -77,25 +89,21 @@ export class LocationService {
 			(pos) => {
 				this.center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
 				this.granted = true;
-				this.mode = 'gps';
 				this.requesting = false;
 				this.permission = 'granted';
-				this._persistCenter(this.center);
 			},
 			(err) => {
-				this.useDefaultCenter();
+				this.center = null;
+				this.granted = false;
+				this.requesting = false;
 				this.permission = this._classifyPermissionError(err);
 			}
 		);
 	}
 
-	/** Keep or restore the pilot-region center without implying GPS was granted. */
-	useDefaultCenter(): void {
-		this.center = { ...DEFAULT_CENTER };
-		this.mode = 'default';
-		this.granted = false;
-		this.requesting = false;
-	}
+	// -------------------------------------------------------------------
+	// Internal
+	// -------------------------------------------------------------------
 
 	private _classifyPermissionError(err: {
 		message: string;
@@ -103,41 +111,6 @@ export class LocationService {
 	}): LocationPermissionState {
 		if (err.code === 1 || /denied|permission/i.test(err.message)) return 'denied';
 		return 'unavailable';
-	}
-
-	private _hydrateFromStorage(): void {
-		if (typeof window === 'undefined') return;
-		try {
-			const raw = window.localStorage.getItem(STORAGE_KEY);
-			if (!raw) return;
-			const parsed = JSON.parse(raw) as unknown;
-			if (
-				parsed &&
-				typeof parsed === 'object' &&
-				'lat' in parsed &&
-				'lng' in parsed &&
-				typeof (parsed as { lat: unknown }).lat === 'number' &&
-				typeof (parsed as { lng: unknown }).lng === 'number' &&
-				!Number.isNaN((parsed as { lat: number }).lat) &&
-				!Number.isNaN((parsed as { lng: number }).lng)
-			) {
-				this.center = {
-					lat: (parsed as { lat: number }).lat,
-					lng: (parsed as { lng: number }).lng
-				};
-			}
-		} catch {
-			// Quota or privacy mode — silently ignore.
-		}
-	}
-
-	private _persistCenter(center: { lat: number; lng: number }): void {
-		if (typeof window === 'undefined') return;
-		try {
-			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(center));
-		} catch {
-			// Quota or privacy mode — silently ignore.
-		}
 	}
 }
 
@@ -167,7 +140,7 @@ export function getLocation(): LocationService {
 	const svc = getContext<LocationService | undefined>(KEY);
 	if (!svc) {
 		throw new Error(
-			'LocationService not initialized. Call createLocation() in a parent layout or page.'
+			'LocationService not initialised. Call createLocation() in a parent layout or page.'
 		);
 	}
 	return svc;
