@@ -7,6 +7,7 @@
 		createLocationPreference,
 		type StagedChoice
 	} from '$lib/core/location/preference.svelte.js';
+	import { createQuery } from '@tanstack/svelte-query';
 	import { fetchProvinces, fetchCities, type RegionResponse } from '$domains/regions';
 
 	let { data } = $props();
@@ -76,29 +77,30 @@
 	});
 
 	// -------------------------------------------------------------------
-	// Region fetching
+	// Region fetching — via svelte-query so results are cached
 	// -------------------------------------------------------------------
 
-	let provinces = $state<RegionResponse[]>([]);
-	let cities = $state<RegionResponse[]>([]);
-	let loadingCities = $state(false);
+	const provincesQuery = createQuery<RegionResponse[]>(() => ({
+		queryKey: ['regions', 'provinces'],
+		queryFn: () => fetchProvinces(),
+		staleTime: 5 * 60 * 1000 // provinces rarely change
+	}));
 
-	$effect(() => {
-		if (!browser) return;
-		fetchProvinces().then((p) => (provinces = p));
-	});
+	const provinces = $derived(provincesQuery.data ?? []);
 
-	$effect(() => {
-		if (!browser || !stagedProvince?.id) {
-			cities = [];
-			return;
-		}
-		loadingCities = true;
-		fetchCities(stagedProvince.id).then((c) => {
-			cities = c;
-			loadingCities = false;
-		});
-	});
+	const citiesQuery = createQuery<RegionResponse[]>(() => ({
+		queryKey: ['regions', 'cities', stagedProvince?.id ?? ''],
+		queryFn: () => {
+			const p = stagedProvince;
+			if (!p?.id) throw new Error('province required');
+			return fetchCities(p.id);
+		},
+		enabled: !!stagedProvince?.id,
+		staleTime: 5 * 60 * 1000
+	}));
+
+	const cities = $derived(citiesQuery.data ?? []);
+	const loadingCities = $derived(citiesQuery.isPending);
 
 	function selectProvince(p: RegionResponse) {
 		stagedProvince = p;
