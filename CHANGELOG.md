@@ -9,6 +9,8 @@ once it tags a release.
 
 ### Added
 
+- **Location onboarding & settings.** Browser timezone is now authoritative for all calendar date boundaries — SSR no longer derives "today" from the server host. All `(app)` routes require a location completion marker (`qarib_location_complete=v1` cookie); missing marker redirects to `/lokasi` onboarding. Visitors choose GPS or manual province/city; preference is stored as a versioned Zod-validated record in `localStorage` only. Region/city data is fetched via cursor-paginated qarib-api runtime endpoints and cached through svelte-query. GPS and manual modes enforce strict query XOR — `lat/lng/radius_km` for GPS, `region_id` for manual, never both. A global settings sheet (bottom sheet on mobile, modal on desktop) is accessible from every app header showing the current location summary and a "Ganti lokasi" link. The onboarding route handles four modes: first-run, marker-recovery (cookies cleared), storage-recovery (localStorage cleared), and intentional replacement.
+
 - `/peta` edge-case UX reconciliation: centered map popups for location/error/empty states, local-calendar month-grid date picker, radius config sheet with `10 → 15 → 25 → 40 → 60 km` steps, neutral nearby place-only pins linking to tempat detail, and future-place counts deduped by event series (`event_id`). Region/city picker remains separate follow-up scope.
 
 - **Phase 1 — Skeleton wiring.**
