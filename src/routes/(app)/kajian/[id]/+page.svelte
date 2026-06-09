@@ -4,7 +4,7 @@
 	import { Skeleton } from '$lib/shared/primitives';
 	import { defineSeriesByIdQuery, defineOccurrencesByEventQuery } from '$domains/events/queries.js';
 	import { prayerIntToLabel } from '$lib/shared/utils/prayer.js';
-	import { formatTime, formatDate } from '$lib/shared/utils/date.js';
+	import { formatTime, formatDate, toDateRange, toLocalIsoDate } from '$lib/shared/utils/date.js';
 	import { deriveInitials } from '$lib/shared/utils/names.js';
 	import type { EventRecurringResponse } from '$domains/events/schema.js';
 	import type { PageData } from './$types';
@@ -35,15 +35,41 @@
 	// ---------------------------------------------------------------------------
 	// Svelte-query: upcoming occurrences for schedule strip
 	// ---------------------------------------------------------------------------
-	const today = new Date().toISOString().slice(0, 10);
+	// Browser-local date initialised after mount so the occurrence query uses
+	// the visitor's timezone, not the server host. Kept disabled until init.
+	let browserDate = $state<string | null>(null);
+
+	$effect(() => {
+		void data;
+		if (browserDate === null) {
+			browserDate = toLocalIsoDate(new Date());
+		}
+	});
+
+	const dateRange = $derived(browserDate ? toDateRange(browserDate) : null);
+	const dateFrom = $derived(dateRange?.date_from ?? null);
+
 	const occurrencesQuery = defineOccurrencesByEventQuery(
-		{ event_id: id, date_from: today, expand: 'place,asatidz', limit: 20 },
+		{
+			get event_id() {
+				return id;
+			},
+			get date_from() {
+				return dateFrom ?? '';
+			},
+			get expand() {
+				return 'place,asatidz' as const;
+			},
+			get limit() {
+				return 20;
+			}
+		},
 		{
 			get requestId() {
 				return data.requestId;
 			},
-			get initialData() {
-				return data.occurrencesInitialData ?? undefined;
+			get enabled() {
+				return dateFrom !== null;
 			}
 		}
 	);
