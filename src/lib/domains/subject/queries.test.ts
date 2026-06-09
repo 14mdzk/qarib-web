@@ -10,7 +10,12 @@ import { describe, it, expect } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../../tests/msw.js';
 import { QueryClient } from '@tanstack/svelte-query';
-import { subjectKeys, defineSubjectByIdQuery, defineSubjectListQuery } from './queries.js';
+import {
+	createSubjectListQueryOptions,
+	subjectKeys,
+	defineSubjectByIdQuery,
+	defineSubjectListQuery
+} from './queries.js';
 
 function buildQc() {
 	return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -104,5 +109,22 @@ describe('defineSubjectByIdQuery options shape', () => {
 	it('defineSubjectListQuery accepts a queryClient param for page-local use', () => {
 		const qc = buildQc();
 		expect(() => defineSubjectListQuery({ limit: 100, is_active: true }, {}, qc)).not.toThrow();
+	});
+
+	it('evaluates reactive enabled state when list query options are created', () => {
+		let browserReady = false;
+		const disabled = createSubjectListQueryOptions(
+			{ limit: 100, is_active: true },
+			{ enabled: () => browserReady }
+		);
+
+		browserReady = true;
+		const enabled = createSubjectListQueryOptions(
+			{ limit: 100, is_active: true },
+			{ enabled: () => browserReady }
+		);
+
+		expect(disabled.enabled).toBe(false);
+		expect(enabled.enabled).toBe(true);
 	});
 });

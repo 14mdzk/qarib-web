@@ -55,6 +55,7 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
+	let browserReady = $state(false);
 	let todayIso = $state<string | null>(null);
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
@@ -174,14 +175,14 @@
 		limit: 30
 	});
 	const nearbyPlacesQuery = definePlaceListQuery(() => nearbyPlaceArgs, {
-		enabled: () => eventsView.selectedSubjectId == null,
+		enabled: () => browserReady && eventsView.selectedSubjectId == null,
 		staleTime: 60_000
 	});
 	const nearbyPlaces = $derived(nearbyPlacesQuery.data?.data ?? []);
 
 	const subjectQuery = defineSubjectListQuery(
 		{ limit: 100, is_active: true },
-		{ staleTime: 5 * 60_000 }
+		{ enabled: () => browserReady, staleTime: 5 * 60_000 }
 	);
 	const subjects = $derived((subjectQuery.data?.data ?? []) as SubjectResponse[]);
 	const selectedSubject = $derived(
@@ -225,7 +226,9 @@
 			later: m.pin_label_later()
 		})
 	);
-	const placeOnlyPinsSource = $derived(eventsView.selectedSubjectId == null ? nearbyPlaces : []);
+	const placeOnlyPinsSource = $derived(
+		query.isSuccess && eventsView.selectedSubjectId == null ? nearbyPlaces : []
+	);
 	const placePins = $derived(
 		mergeNearbyPlacesWithEventPins(eventPlacePins, placeOnlyPinsSource, m.pin_label_place()).map(
 			(pin) => ({
@@ -413,6 +416,7 @@
 	const GHOST_PIN_DELAYS = ['0s', '0.3s', '0.6s', '0.9s', '1.2s'];
 
 	onMount(() => {
+		browserReady = true;
 		const localToday = toLocalIsoDate(new Date());
 		todayIso = localToday;
 		calendarMonth = `${localToday.slice(0, 7)}-01`;

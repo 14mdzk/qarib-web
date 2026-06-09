@@ -22,6 +22,8 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 
+test.describe.configure({ mode: 'serial' });
+
 function addDaysIso(days: number): string {
 	const date = new Date();
 	date.setDate(date.getDate() + days);
@@ -365,6 +367,35 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(markers.first()).toBeVisible({ timeout: 10_000 });
 		await expect(markers).toHaveCount(2);
 		await expect(placePinMarkers(page)).toHaveCount(1);
+	});
+
+	test('waits for events before classifying nearby places as place-only', async ({ page }) => {
+		let releaseEvents!: () => void;
+		const eventsBlocked = new Promise<void>((resolve) => {
+			releaseEvents = resolve;
+		});
+		await page.route('**/api/upstream/events/nearby?**', async (route) => {
+			await eventsBlocked;
+			await route.continue();
+		});
+
+		const placesResponse = page.waitForResponse(
+			(response) => response.url().includes('/api/upstream/places?') && response.ok()
+		);
+		await page.goto('/peta');
+		await placesResponse;
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await expect(placePinMarkers(page)).toHaveCount(0);
+		await expect(eventPinMarkers(page)).toHaveCount(0);
+
+		releaseEvents();
+		await expect(eventPinMarkers(page)).toHaveCount(2);
+		await expect(placePinMarkers(page)).toHaveCount(1);
+
+		await eventPinMarkers(page).first().click();
+		await expect(page).toHaveURL(/\/peta$/);
+		await expect(page.getByRole('complementary').first()).toBeVisible();
 	});
 
 	test('place-only pin routes to tempat without opening PinSheet', async ({ page }) => {
