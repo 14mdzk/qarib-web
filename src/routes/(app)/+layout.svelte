@@ -4,6 +4,7 @@
 	import { browser } from '$app/environment';
 	import AppHeader from '$lib/shared/composites/app-header.svelte';
 	import { resolveHeaderMode } from '$lib/shared/composites/header-mode';
+	import LocationSettings from '$lib/shared/composites/location-settings.svelte';
 	import { createLocationPreference, normaliseReturnTo } from '$lib/core/location/index.svelte.js';
 
 	let { children } = $props();
@@ -13,6 +14,8 @@
 
 	// Instantiate context-scoped services once per app lifetime.
 	const pref = createLocationPreference();
+
+	let settingsOpen = $state(false);
 
 	// -------------------------------------------------------------------
 	// Client reconciliation
@@ -40,8 +43,13 @@
 </script>
 
 <div class="bg-surface mx-auto min-h-screen max-w-2xl">
-	<AppHeader {mode} title={meta?.title} />
+	<AppHeader {mode} title={meta?.title} onsettingsclick={() => (settingsOpen = true)} />
 	{#if ready}
 		<main>{@render children()}</main>
 	{/if}
+	<LocationSettings
+		open={settingsOpen}
+		onclose={() => (settingsOpen = false)}
+		currentPath={page.url.pathname + page.url.search}
+	/>
 </div>

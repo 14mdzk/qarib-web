@@ -10,9 +10,15 @@
 		mode?: HeaderMode;
 		title?: string;
 		onBack?: () => void;
+		onsettingsclick?: () => void;
 	}
 
-	let { mode = 'home', title = '', onBack = () => history.back() }: Props = $props();
+	let {
+		mode = 'home',
+		title = '',
+		onBack = () => history.back(),
+		onsettingsclick = undefined
+	}: Props = $props();
 </script>
 
 <header class="bg-surface sticky top-0 z-10 mx-auto flex h-14 max-w-2xl items-center gap-3 shadow">
@@ -44,13 +50,23 @@
 				</svg>
 				<span>{m.nav_search_placeholder()}</span>
 			</button>
-			<Button variant="ghost" size="sm"><Settings size="18" /></Button>
+			<Button
+				variant="ghost"
+				size="sm"
+				onclick={onsettingsclick}
+				aria-label={m.setting_location_label()}><Settings size="18" /></Button
+			>
 		</div>
 	{:else}
 		<div class="flex w-full items-center gap-3 px-2">
 			<BackButton onclick={onBack} class="h-10 w-10" />
 			<h1 class="text-content font-medium">{title || 'Page Title'}</h1>
-			<div class="w-8"></div>
+			<button
+				type="button"
+				class="flex h-8 w-8 items-center justify-center"
+				onclick={onsettingsclick}
+				aria-label={m.setting_location_label()}><Settings size="18" class="text-ink-3" /></button
+			>
 		</div>
 	{/if}
 </header>
