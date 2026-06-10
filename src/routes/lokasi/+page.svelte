@@ -54,9 +54,16 @@
 				stagedMode = 'manual';
 				stagedProvince = {
 					id: pref.active.province.id,
-					name: pref.active.province.name
+					name: pref.active.province.name,
+					latitude: pref.active.province.coordinates?.lat,
+					longitude: pref.active.province.coordinates?.lng
 				} as RegionResponse;
-				stagedCity = { id: pref.active.city.id, name: pref.active.city.name } as RegionResponse;
+				stagedCity = {
+					id: pref.active.city.id,
+					name: pref.active.city.name,
+					latitude: pref.active.city.coordinates?.lat,
+					longitude: pref.active.city.coordinates?.lng
+				} as RegionResponse;
 			}
 		}
 	});
@@ -115,16 +122,12 @@
 		(stagedMode === 'gps' && stagedCoords !== null) ||
 			(stagedMode === 'manual' && stagedProvince !== null && stagedCity !== null)
 	);
-
-	// -------------------------------------------------------------------
-	// Completion
-	// -------------------------------------------------------------------
-
 	let completionError = $state(false);
 	let storageError = $state(false);
+	let submitting = $state(false);
 
-	function handleCompletion() {
-		if (!canSave) return;
+	function handleCompletion(): boolean {
+		if (!canSave) return false;
 
 		let choice: StagedChoice;
 		if (stagedMode === 'gps' && stagedCoords) {
@@ -132,35 +135,72 @@
 		} else if (stagedMode === 'manual' && stagedProvince && stagedCity) {
 			choice = {
 				mode: 'manual',
-				province: { id: stagedProvince.id!, name: stagedProvince.name! },
-				city: { id: stagedCity.id!, name: stagedCity.name! }
+				province: {
+					id: stagedProvince.id!,
+					name: stagedProvince.name!,
+					coordinates: {
+						lat: stagedProvince.latitude!,
+						lng: stagedProvince.longitude!
+					}
+				},
+				city: {
+					id: stagedCity.id!,
+					name: stagedCity.name!,
+					coordinates: {
+						lat: stagedCity.latitude!,
+						lng: stagedCity.longitude!
+					}
+				}
 			};
 		} else {
-			return;
+			return false;
 		}
 
 		try {
 			pref.commitStaged(choice);
+			return true;
 		} catch {
 			storageError = true;
-			return;
+			return false;
 		}
 	}
 
-	// -------------------------------------------------------------------
-	// Marker recovery — restore only cookie
-	// -------------------------------------------------------------------
+	async function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		if (submitting) return;
 
-	function handleRecovery() {
+		submitting = true;
 		completionError = false;
-		// The form action sets the cookie; no preference data is sent.
-		const form = document.querySelector('form') as HTMLFormElement;
-		form?.requestSubmit();
-	}
+		storageError = false;
 
-	// -------------------------------------------------------------------
-	// Cancel (replacement mode only)
-	// -------------------------------------------------------------------
+		if (mode !== 'marker-recovery') {
+			const ok = handleCompletion();
+			if (!ok) {
+				submitting = false;
+				return;
+			}
+		}
+
+		const form = event.currentTarget as HTMLFormElement;
+		const formData = new FormData(form);
+
+		try {
+			const res = await fetch(form.action || '', {
+				method: 'POST',
+				body: formData
+			});
+			if (res.ok) {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve
+				goto(data.returnTo, { replaceState: true });
+			} else {
+				completionError = true;
+				submitting = false;
+			}
+		} catch {
+			completionError = true;
+			submitting = false;
+		}
+	}
 
 	function handleCancel() {
 		const target = data.returnTo;
@@ -315,21 +355,14 @@
 				</div>
 
 				<!-- Save (form action for completion) -->
-				<form
-					method="POST"
-					onsubmit={() => {
-						if (!canSave) return false;
-						handleCompletion();
-						return true;
-					}}
-				>
+				<form method="POST" onsubmit={handleSubmit}>
 					<input type="hidden" name="returnTo" value={data.returnTo} />
 					<button
 						type="submit"
 						class="bg-ink text-paper mt-2 w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-40"
-						disabled={!canSave}
+						disabled={!canSave || submitting}
 					>
-						{m.lokasi_save()}
+						{submitting ? '...' : m.lokasi_save()}
 					</button>
 				</form>
 
@@ -357,13 +390,14 @@
 				<p class="text-ink text-sm font-semibold">{activeLabel}</p>
 				<p class="text-ink-4 mt-1 text-xs">tersimpan sebelumnya</p>
 			</div>
-			<form method="POST" class="mt-4 flex flex-col gap-3" onsubmit={handleRecovery}>
+			<form method="POST" class="mt-4 flex flex-col gap-3" onsubmit={handleSubmit}>
 				<input type="hidden" name="returnTo" value={data.returnTo} />
 				<button
 					type="submit"
 					class="bg-orange text-paper w-full rounded-2xl py-3 text-sm font-semibold"
+					disabled={submitting}
 				>
-					{m.lokasi_recovery_continue()}
+					{submitting ? '...' : m.lokasi_recovery_continue()}
 				</button>
 			</form>
 			<p class="text-ink-4 mt-2 text-center text-xs">
@@ -434,21 +468,14 @@
 				{#each cities as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
 			</select>
 
-			<form
-				method="POST"
-				onsubmit={() => {
-					if (!canSave) return false;
-					handleCompletion();
-					return true;
-				}}
-			>
+			<form method="POST" onsubmit={handleSubmit}>
 				<input type="hidden" name="returnTo" value={data.returnTo} />
 				<button
 					type="submit"
 					class="bg-orange text-paper mb-3 w-full rounded-2xl py-3 text-sm font-semibold disabled:opacity-40"
-					disabled={!canSave}
+					disabled={!canSave || submitting}
 				>
-					{m.lokasi_save()}
+					{submitting ? '...' : m.lokasi_save()}
 				</button>
 			</form>
 

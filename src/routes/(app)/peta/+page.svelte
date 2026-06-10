@@ -247,8 +247,14 @@
 
 	// Map center + userLocation derived from location store.
 	const mapCenter = $derived<[number, number]>([
-		location.center?.lat ?? -6.732,
-		location.center?.lng ?? 108.5523
+		location.center?.lat ??
+			(pref.active?.mode === 'manual' && pref.active.city.coordinates
+				? pref.active.city.coordinates.lat
+				: -6.732),
+		location.center?.lng ??
+			(pref.active?.mode === 'manual' && pref.active.city.coordinates
+				? pref.active.city.coordinates.lng
+				: 108.5523)
 	]);
 	const userLocation = $derived<[number, number] | undefined>(
 		location.granted && location.center ? [location.center.lat, location.center.lng] : undefined
@@ -522,7 +528,7 @@
 	{/if}
 
 	<!-- Location denied/unavailable: warm popup over the live map -->
-	{#if showLocationNotice}
+	{#if showLocationNotice && !isManual}
 		<div
 			class="edge-sheet"
 			role="status"

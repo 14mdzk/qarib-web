@@ -29,17 +29,19 @@ export const load: PageServerLoad = async ({ url, cookies }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ request, cookies }) => {
+	default: async ({ request, cookies, url }) => {
 		const data = await request.formData();
 		const raw = data.get('returnTo');
 		const safeReturn = normaliseReturnTo(typeof raw === 'string' ? raw : null);
+
+		const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
 		cookies.set(COMPLETION_COOKIE, COMPLETION_VALUE, {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'lax',
 			maxAge: ONE_YEAR,
-			secure: process.env.NODE_ENV !== 'development'
+			secure: !isLocalhost && process.env.NODE_ENV === 'production'
 		});
 
 		redirect(303, safeReturn);

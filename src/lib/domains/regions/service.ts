@@ -69,7 +69,7 @@ export async function accumulateRegions(
 }
 
 /**
- * Fetch provinces — regions whose `location_path` has exactly one element.
+ * Fetch provinces.
  * Accumulates all pages with `limit=100`.
  */
 export async function fetchProvinces(opts?: ApiCallOptions): Promise<RegionResponse[]> {

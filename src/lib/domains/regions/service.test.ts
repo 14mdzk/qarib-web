@@ -29,20 +29,21 @@ function paginated(data: RegionResponse[], hasMore = false, nextCursor?: string)
 describe('fetchProvinces', () => {
 	afterEach(() => server.resetHandlers());
 
-	it('classifies regions with one-element location_path as provinces', async () => {
+	it('fetches provinces from regions API without filtering', async () => {
 		server.use(
 			http.get('http://localhost/api/upstream/regions', () =>
 				HttpResponse.json(
 					paginated([
 						makeRegion({ id: '32', name: 'Jawa Barat', location_path: ['32'] }),
-						makeRegion({ id: '3273', name: 'Kota Bandung', location_path: ['32', '3273'] })
+						makeRegion({ id: '33', name: 'Jawa Tengah', location_path: ['33'] })
 					])
 				)
 			)
 		);
 		const provinces = await fetchProvinces(baseOpts());
-		expect(provinces).toHaveLength(1);
+		expect(provinces).toHaveLength(2);
 		expect(provinces[0].name).toBe('Jawa Barat');
+		expect(provinces[1].name).toBe('Jawa Tengah');
 	});
 });
 

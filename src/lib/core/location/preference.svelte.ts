@@ -28,13 +28,14 @@ const GPS_RADIUS_VALUES = [10, 15, 25, 40, 60] as const;
 // ---------------------------------------------------------------------------
 
 const coordinatesSchema = z.object({
-	lat: z.number().finite().min(-90).max(90),
-	lng: z.number().finite().min(-180).max(180)
+	lat: z.number().min(-90).max(90),
+	lng: z.number().min(-180).max(180)
 });
 
 const regionRefSchema = z.object({
 	id: z.string().min(1),
-	name: z.string().min(1)
+	name: z.string().min(1),
+	coordinates: coordinatesSchema.optional()
 });
 
 const gpsPreferenceSchema = z.object({
@@ -139,6 +140,7 @@ export class LocationPreferenceService {
 	 * action has succeeded.
 	 */
 	commitStaged(choice: StagedChoice): LocationPreference {
+		console.warn('WHAT IS THIS', choice);
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const savedAt = new Date().toISOString();
 		let pref: LocationPreference;
