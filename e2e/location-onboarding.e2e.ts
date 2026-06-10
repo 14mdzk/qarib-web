@@ -20,10 +20,17 @@ test.beforeEach(async ({ page }) => {
 // ---------------------------------------------------------------------------
 
 async function clearLocationState(page: Page): Promise<void> {
+	if (page.url() === 'about:blank') {
+		await page.goto('/');
+	}
 	try {
 		await page.evaluate(() => {
-			window.localStorage.removeItem('qarib:location-preference');
-			window.localStorage.removeItem('qarib:location:center');
+			try {
+				window.localStorage.removeItem('qarib:location-preference');
+				window.localStorage.removeItem('qarib:location:center');
+			} catch {
+				// ignore
+			}
 		});
 	} catch {
 		// Ignore SecurityError on about:blank
@@ -64,7 +71,7 @@ async function setCompletionCookie(page: Page): Promise<void> {
 test('landing page loads without location marker', async ({ page }) => {
 	await page.goto('/');
 	await clearLocationState(page);
-	await page.reload();
+	await page.goto('/');
 	await expect(page.locator('text=Qarib').first()).toBeVisible();
 	await expect(page).not.toHaveURL(/\/lokasi/);
 });

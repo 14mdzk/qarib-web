@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { enhance } from '$app/forms';
 	import { m } from '$core/i18n';
 	import { createLocation } from '$lib/core/location/index.svelte.js';
 	import {
 		createLocationPreference,
-		type StagedChoice
+		type LocationPreference
 	} from '$lib/core/location/preference.svelte.js';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { fetchProvinces, fetchCities, type RegionResponse } from '$domains/regions';
@@ -129,12 +130,20 @@
 	function handleCompletion(): boolean {
 		if (!canSave) return false;
 
-		let choice: StagedChoice;
+		let prefData: LocationPreference;
+		const savedAt = new Date().toISOString();
 		if (stagedMode === 'gps' && stagedCoords) {
-			choice = { mode: 'gps', coordinates: stagedCoords };
+			prefData = {
+				version: 1,
+				mode: 'gps',
+				savedAt,
+				coordinates: stagedCoords
+			};
 		} else if (stagedMode === 'manual' && stagedProvince && stagedCity) {
-			choice = {
+			prefData = {
+				version: 1,
 				mode: 'manual',
+				savedAt,
 				province: {
 					id: stagedProvince.id!,
 					name: stagedProvince.name!,
@@ -157,7 +166,7 @@
 		}
 
 		try {
-			pref.commitStaged(choice);
+			pref.commitStaged(prefData);
 			return true;
 		} catch {
 			storageError = true;
@@ -165,42 +174,9 @@
 		}
 	}
 
-	async function handleSubmit(event: SubmitEvent) {
-		event.preventDefault();
-		if (submitting) return;
-
-		submitting = true;
-		completionError = false;
-		storageError = false;
-
-		if (mode !== 'marker-recovery') {
-			const ok = handleCompletion();
-			if (!ok) {
-				submitting = false;
-				return;
-			}
-		}
-
-		const form = event.currentTarget as HTMLFormElement;
-		const formData = new FormData(form);
-
-		try {
-			const res = await fetch(form.action || '', {
-				method: 'POST',
-				body: formData
-			});
-			if (res.ok) {
-				// eslint-disable-next-line svelte/no-navigation-without-resolve
-				goto(data.returnTo, { replaceState: true });
-			} else {
-				completionError = true;
-				submitting = false;
-			}
-		} catch {
-			completionError = true;
-			submitting = false;
-		}
-	}
+	// -------------------------------------------------------------------
+	// Cancel (replacement mode only)
+	// -------------------------------------------------------------------
 
 	function handleCancel() {
 		const target = data.returnTo;
@@ -319,7 +295,7 @@
 							if (found) selectProvince(found);
 						}}
 					>
-						<option value="">{m.lokasi_city_placeholder()}</option>
+						<option value="">{m.lokasi_province_placeholder()}</option>
 						{#each provinces as p (p.id)}
 							<option value={p.id}>{p.name}</option>
 						{/each}
@@ -335,7 +311,7 @@
 					>
 					<select
 						id="lokasi-city"
-						class="border-line bg-paper text-ink w-full rounded-xl border px-4 py-3 text-sm"
+						class="border-line bg-paper disabled:bg-ink-1 disabled:text-ink-2 text-ink w-full rounded-xl border px-4 py-3 text-sm disabled:opacity-50"
 						value={stagedCity?.id ?? ''}
 						disabled={!stagedProvince || loadingCities}
 						onchange={(e) => {
@@ -347,7 +323,7 @@
 							}
 						}}
 					>
-						<option value="">{loadingCities ? '...' : m.lokasi_city_placeholder()}</option>
+						<option value="">{m.lokasi_city_placeholder()}</option>
 						{#each cities as c (c.id)}
 							<option value={c.id}>{c.name}</option>
 						{/each}
@@ -355,7 +331,22 @@
 				</div>
 
 				<!-- Save (form action for completion) -->
-				<form method="POST" onsubmit={handleSubmit}>
+				<form
+					method="POST"
+					use:enhance={({ cancel }) => {
+						if (!canSave) {
+							cancel();
+							return;
+						}
+						handleCompletion();
+						return async ({ result }) => {
+							if (result.type === 'redirect') {
+								// eslint-disable-next-line svelte/no-navigation-without-resolve
+								goto(result.location, { replaceState: true });
+							}
+						};
+					}}
+				>
 					<input type="hidden" name="returnTo" value={data.returnTo} />
 					<button
 						type="submit"
@@ -390,7 +381,18 @@
 				<p class="text-ink text-sm font-semibold">{activeLabel}</p>
 				<p class="text-ink-4 mt-1 text-xs">tersimpan sebelumnya</p>
 			</div>
-			<form method="POST" class="mt-4 flex flex-col gap-3" onsubmit={handleSubmit}>
+			<form
+				method="POST"
+				class="mt-4 flex flex-col gap-3"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.type === 'redirect') {
+							// eslint-disable-next-line svelte/no-navigation-without-resolve
+							goto(result.location, { replaceState: true });
+						}
+					};
+				}}
+			>
 				<input type="hidden" name="returnTo" value={data.returnTo} />
 				<button
 					type="submit"
@@ -468,7 +470,22 @@
 				{#each cities as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
 			</select>
 
-			<form method="POST" onsubmit={handleSubmit}>
+			<form
+				method="POST"
+				use:enhance={({ cancel }) => {
+					if (!canSave) {
+						cancel();
+						return;
+					}
+					handleCompletion();
+					return async ({ result }) => {
+						if (result.type === 'redirect') {
+							// eslint-disable-next-line svelte/no-navigation-without-resolve
+							goto(result.location, { replaceState: true });
+						}
+					};
+				}}
+			>
 				<input type="hidden" name="returnTo" value={data.returnTo} />
 				<button
 					type="submit"

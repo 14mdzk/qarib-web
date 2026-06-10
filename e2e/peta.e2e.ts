@@ -57,6 +57,23 @@ async function useCirebonGeolocation(page: Page): Promise<void> {
 	});
 }
 
+async function setupLocationState(page: Page): Promise<void> {
+	// Must navigate to a page under the same origin first to set cookies/localStorage
+	await page.goto('/');
+	await page.evaluate(() => {
+		document.cookie = 'qarib_location_complete=v1; path=/; SameSite=Lax';
+		window.localStorage.setItem(
+			'qarib:location-preference',
+			JSON.stringify({
+				version: 1,
+				mode: 'gps',
+				savedAt: new Date().toISOString(),
+				coordinates: { lat: -6.732, lng: 108.5523 }
+			})
+		);
+	});
+}
+
 async function denyGeolocation(page: Page, message = 'User denied Geolocation'): Promise<void> {
 	await page.addInitScript((errorMessage) => {
 		const win = window as Window & { __qaribGeoCalls?: number };
@@ -144,6 +161,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 	test.use({ timezoneId: 'Asia/Jakarta' });
 
 	test.beforeEach(async ({ context, page }) => {
+		await setupLocationState(page);
 		await useCirebonGeolocation(page);
 		// Set completion cookie
 		await context.addCookies([
@@ -553,6 +571,8 @@ test.describe('/peta — browser-local date bounds', () => {
 	});
 
 	test('uses separate local offsets across DST transition day', async ({ page }) => {
+		await setupLocationState(page);
+		await useCirebonGeolocation(page);
 		await page.clock.setFixedTime(new Date('2026-03-08T12:00:00-04:00'));
 		const request = waitForNearbyRequest(
 			page,
