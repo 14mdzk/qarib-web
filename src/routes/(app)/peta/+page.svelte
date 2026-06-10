@@ -20,7 +20,7 @@
 		toDateRange,
 		toLocalIsoDate
 	} from '$lib/shared/utils/date.js';
-	import { createLocation } from '$core/location/index.svelte.js';
+	import { createLocation, getLocationPreference } from '$core/location/index.svelte.js';
 	import {
 		createEventsView,
 		MAX_RADIUS_KM,
@@ -55,6 +55,7 @@
 
 	const location = createLocation();
 	const eventsView = createEventsView();
+	const pref = getLocationPreference();
 	let browserReady = $state(false);
 	let todayIso = $state<string | null>(null);
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
@@ -148,10 +149,14 @@
 	const dateRange = $derived(activeDay ? toDateRange(activeDay) : null);
 	const dateReady = $derived(activeDay != null && dateRange != null);
 
+	const isManual = $derived(pref.active?.mode === 'manual');
+	const regionId = $derived(pref.active?.mode === 'manual' ? pref.active.city.id : undefined);
+
 	const queryArgs = $derived({
-		lat: location.center?.lat,
-		lng: location.center?.lng,
-		radius_km: eventsView.selectedRadiusKm,
+		lat: isManual ? undefined : location.center?.lat,
+		lng: isManual ? undefined : location.center?.lng,
+		radius_km: isManual ? undefined : eventsView.selectedRadiusKm,
+		region_id: regionId,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
 		date_from: dateRange?.date_from,
 		date_to: dateRange?.date_to,
@@ -168,9 +173,10 @@
 	const events = $derived((query.data?.pages ?? []).flatMap((p) => p.data));
 
 	const nearbyPlaceArgs = $derived({
-		near_lat: location.center?.lat,
-		near_lng: location.center?.lng,
-		radius_km: eventsView.selectedRadiusKm,
+		near_lat: isManual ? undefined : location.center?.lat,
+		near_lng: isManual ? undefined : location.center?.lng,
+		radius_km: isManual ? undefined : eventsView.selectedRadiusKm,
+		region_id: regionId,
 		is_active: true,
 		limit: 30
 	});
@@ -196,9 +202,10 @@
 
 	const fallbackDateRange = $derived(futureRange());
 	const fallbackArgs = $derived({
-		lat: location.center?.lat,
-		lng: location.center?.lng,
-		radius_km: MAX_RADIUS_KM,
+		lat: isManual ? undefined : location.center?.lat,
+		lng: isManual ? undefined : location.center?.lng,
+		radius_km: isManual ? undefined : MAX_RADIUS_KM,
+		region_id: regionId,
 		subject_id: eventsView.selectedSubjectId ?? undefined,
 		date_from: fallbackDateRange?.date_from,
 		date_to: fallbackDateRange?.date_to,
@@ -264,11 +271,15 @@
 			}),
 			active: activeFilterSheet === 'subject'
 		},
-		{
-			key: 'radius',
-			label: m.peta_filter_radius_label({ value: eventsView.selectedRadiusKm }),
-			active: activeFilterSheet === 'radius'
-		}
+		...(isManual
+			? []
+			: [
+					{
+						key: 'radius' as const,
+						label: m.peta_filter_radius_label({ value: eventsView.selectedRadiusKm }),
+						active: activeFilterSheet === 'radius'
+					}
+				])
 	]);
 
 	// ---------------------------------------------------------------------------
