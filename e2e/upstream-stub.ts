@@ -350,6 +350,47 @@ prefixRoutes.push({
 	}
 });
 
+prefixRoutes.push({
+	method: 'GET',
+	prefix: '/regions',
+	handler: (req, res) => {
+		const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+		const parent = params.get('parent');
+
+		if (!parent) {
+			return json(
+				res,
+				200,
+				paginated([
+					{
+						id: '32',
+						name: 'Jawa Barat',
+						latitude: -6.9147,
+						longitude: 107.6098,
+						location_path: ['32']
+					}
+				])
+			);
+		} else if (parent === '32') {
+			return json(
+				res,
+				200,
+				paginated([
+					{
+						id: '3273',
+						name: 'Kota Bandung',
+						latitude: -6.9175,
+						longitude: 107.6191,
+						location_path: ['32', '3273']
+					}
+				])
+			);
+		}
+
+		json(res, 200, paginated([]));
+	}
+});
+
 // ---------------------------------------------------------------------------
 // Server factory
 // ---------------------------------------------------------------------------

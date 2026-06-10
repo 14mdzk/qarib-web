@@ -82,6 +82,8 @@
 	let clusterLayerGroup: any;
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Leaflet Marker; nullable, typed via `L` above
 	let userMarker: any;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Leaflet Marker; nullable, typed via `L` above
+	let centerMarker: any;
 
 	// Check prefers-reduced-motion once at mount; memoised in a boolean.
 	let reducedMotion = false;
@@ -139,6 +141,44 @@
 			html,
 			iconSize: [16, 16],
 			iconAnchor: [8, 8]
+		});
+	}
+
+	/**
+	 * Custom region center marker: 20px orange circle with white border and pulsing ring.
+	 * Shown in manual location mode to highlight the search center.
+	 */
+	function buildCenterMarkerIcon(): unknown {
+		const ringStyle = reducedMotion
+			? [
+					'position:absolute',
+					'inset:-8px',
+					'border-radius:50%',
+					'background:rgba(234,88,12,0.2)'
+				].join(';')
+			: [
+					'position:absolute',
+					'inset:-8px',
+					'border-radius:50%',
+					'background:rgba(234,88,12,0.2)',
+					'animation:ghost-pulse 2.2s ease-in-out infinite'
+				].join(';');
+
+		const html = `<div style="${[
+			'position:relative',
+			'width:20px',
+			'height:20px',
+			'border-radius:50%',
+			'background:var(--color-orange)',
+			'border:3px solid white',
+			'box-shadow:0 2px 8px rgba(234,88,12,0.5)'
+		].join(';')}"><div style="${ringStyle}"></div></div>`;
+
+		return L.divIcon({
+			className: '',
+			html,
+			iconSize: [20, 20],
+			iconAnchor: [10, 10]
 		});
 	}
 
@@ -205,6 +245,17 @@
 		}
 	}
 
+	function renderCenterMarker(loc: [number, number], hasUserLoc: boolean): void {
+		if (!map) return;
+		if (centerMarker) {
+			centerMarker.remove();
+			centerMarker = null;
+		}
+		if (loc && !hasUserLoc) {
+			centerMarker = L.marker(loc, { icon: buildCenterMarkerIcon(), zIndexOffset: 999 }).addTo(map);
+		}
+	}
+
 	function zoomIn(): void {
 		map?.zoomIn();
 	}
@@ -249,6 +300,7 @@
 		renderPins(pins);
 		renderClusters(clusters);
 		renderUserLocation(userLocation);
+		renderCenterMarker(center, !!userLocation);
 	});
 
 	// Reactively re-render pins when the prop changes.
@@ -271,6 +323,13 @@
 	$effect(() => {
 		if (map) {
 			renderUserLocation(userLocation);
+		}
+	});
+
+	// Reactively update the center marker.
+	$effect(() => {
+		if (map) {
+			renderCenterMarker(center, !!userLocation);
 		}
 	});
 
