@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { enhance } from '$app/forms';
 	import { m } from '$core/i18n';
 	import { createLocation } from '$lib/core/location/index.svelte.js';
 	import {
 		createLocationPreference,
-		type StagedChoice
+		type LocationPreference
 	} from '$lib/core/location/preference.svelte.js';
 	import { createQuery } from '@tanstack/svelte-query';
 	import { fetchProvinces, fetchCities, type RegionResponse } from '$domains/regions';
@@ -126,12 +127,20 @@
 	function handleCompletion() {
 		if (!canSave) return;
 
-		let choice: StagedChoice;
+		let prefData: LocationPreference;
+		const savedAt = new Date().toISOString();
 		if (stagedMode === 'gps' && stagedCoords) {
-			choice = { mode: 'gps', coordinates: stagedCoords };
+			prefData = {
+				version: 1,
+				mode: 'gps',
+				savedAt,
+				coordinates: stagedCoords
+			};
 		} else if (stagedMode === 'manual' && stagedProvince && stagedCity) {
-			choice = {
+			prefData = {
+				version: 1,
 				mode: 'manual',
+				savedAt,
 				province: { id: stagedProvince.id!, name: stagedProvince.name! },
 				city: { id: stagedCity.id!, name: stagedCity.name! }
 			};
@@ -140,22 +149,11 @@
 		}
 
 		try {
-			pref.commitStaged(choice);
+			window.localStorage.setItem('qarib:location-preference', JSON.stringify(prefData));
 		} catch {
 			storageError = true;
 			return;
 		}
-	}
-
-	// -------------------------------------------------------------------
-	// Marker recovery — restore only cookie
-	// -------------------------------------------------------------------
-
-	function handleRecovery() {
-		completionError = false;
-		// The form action sets the cookie; no preference data is sent.
-		const form = document.querySelector('form') as HTMLFormElement;
-		form?.requestSubmit();
 	}
 
 	// -------------------------------------------------------------------
@@ -317,10 +315,18 @@
 				<!-- Save (form action for completion) -->
 				<form
 					method="POST"
-					onsubmit={() => {
-						if (!canSave) return false;
+					use:enhance={({ cancel }) => {
+						if (!canSave) {
+							cancel();
+							return;
+						}
 						handleCompletion();
-						return true;
+						return async ({ result }) => {
+							if (result.type === 'redirect') {
+								// eslint-disable-next-line svelte/no-navigation-without-resolve
+								goto(result.location, { replaceState: true });
+							}
+						};
 					}}
 				>
 					<input type="hidden" name="returnTo" value={data.returnTo} />
@@ -357,7 +363,18 @@
 				<p class="text-ink text-sm font-semibold">{activeLabel}</p>
 				<p class="text-ink-4 mt-1 text-xs">tersimpan sebelumnya</p>
 			</div>
-			<form method="POST" class="mt-4 flex flex-col gap-3" onsubmit={handleRecovery}>
+			<form
+				method="POST"
+				class="mt-4 flex flex-col gap-3"
+				use:enhance={() => {
+					return async ({ result }) => {
+						if (result.type === 'redirect') {
+							// eslint-disable-next-line svelte/no-navigation-without-resolve
+							goto(result.location, { replaceState: true });
+						}
+					};
+				}}
+			>
 				<input type="hidden" name="returnTo" value={data.returnTo} />
 				<button
 					type="submit"
@@ -436,10 +453,18 @@
 
 			<form
 				method="POST"
-				onsubmit={() => {
-					if (!canSave) return false;
+				use:enhance={({ cancel }) => {
+					if (!canSave) {
+						cancel();
+						return;
+					}
 					handleCompletion();
-					return true;
+					return async ({ result }) => {
+						if (result.type === 'redirect') {
+							// eslint-disable-next-line svelte/no-navigation-without-resolve
+							goto(result.location, { replaceState: true });
+						}
+					};
 				}}
 			>
 				<input type="hidden" name="returnTo" value={data.returnTo} />

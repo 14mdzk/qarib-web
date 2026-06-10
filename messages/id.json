@@ -100,6 +100,7 @@
 	"peta_subject_sheet_title": "Pilih tema",
 	"peta_radius_sheet_title": "Atur radius",
 	"peta_radius_sheet_body": "Pilih jarak pencarian. Pilihan kota/region dipisah ke PR berikutnya supaya alurnya tidak campur aduk.",
+	"peta_radius_manual_body": "Pencarian manual mengikuti batas kota/kabupaten yang dipilih, sehingga radius kilometer tidak berlaku.",
 	"peta_location_denied_title": "Izin lokasi ditolak",
 	"peta_location_unavailable_title": "Lokasi tidak tersedia",
 	"peta_location_default_body": "Peta memakai area Cirebon dulu. Aktifkan GPS lagi kalau ingin pindah ke posisimu.",

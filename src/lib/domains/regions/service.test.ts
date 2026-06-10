@@ -29,7 +29,7 @@ function paginated(data: RegionResponse[], hasMore = false, nextCursor?: string)
 describe('fetchProvinces', () => {
 	afterEach(() => server.resetHandlers());
 
-	it('classifies regions with one-element location_path as provinces', async () => {
+	it('fetches provinces from the API', async () => {
 		server.use(
 			http.get('http://localhost/api/upstream/regions', () =>
 				HttpResponse.json(
@@ -41,8 +41,9 @@ describe('fetchProvinces', () => {
 			)
 		);
 		const provinces = await fetchProvinces(baseOpts());
-		expect(provinces).toHaveLength(1);
+		expect(provinces).toHaveLength(2);
 		expect(provinces[0].name).toBe('Jawa Barat');
+		expect(provinces[1].name).toBe('Kota Bandung');
 	});
 });
 

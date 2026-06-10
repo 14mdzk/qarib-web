@@ -271,15 +271,11 @@
 			}),
 			active: activeFilterSheet === 'subject'
 		},
-		...(isManual
-			? []
-			: [
-					{
-						key: 'radius' as const,
-						label: m.peta_filter_radius_label({ value: eventsView.selectedRadiusKm }),
-						active: activeFilterSheet === 'radius'
-					}
-				])
+		{
+			key: 'radius',
+			label: m.peta_filter_radius_label({ value: eventsView.selectedRadiusKm }),
+			active: activeFilterSheet === 'radius'
+		}
 	]);
 
 	// ---------------------------------------------------------------------------
@@ -721,7 +717,6 @@
 			</div>
 		</div>
 	{/if}
-
 	{#if activeFilterSheet === 'radius'}
 		<div
 			class="filter-sheet filter-sheet--radius"
@@ -732,11 +727,14 @@
 				<Radar class="size-4" aria-hidden="true" />
 				<span>{m.peta_radius_sheet_title()}</span>
 			</div>
-			<p class="filter-sheet__lede">{m.peta_radius_sheet_body()}</p>
+			<p class="filter-sheet__lede">
+				{isManual ? m.peta_radius_manual_body() : m.peta_radius_sheet_body()}
+			</p>
 			<div class="radius-options">
 				{#each RADIUS_STEPS_KM as radius (radius)}
 					<button
-						class:active={eventsView.selectedRadiusKm === radius}
+						class:active={!isManual && eventsView.selectedRadiusKm === radius}
+						disabled={isManual}
 						onclick={() => selectRadius(radius)}
 					>
 						{m.peta_filter_radius_label({ value: radius })}
@@ -1020,10 +1018,12 @@
 		justify-content: space-between;
 		gap: 10px;
 		padding: 0 11px;
+		cursor: pointer;
 	}
 
-	.filter-sheet button {
-		cursor: pointer;
+	.filter-sheet button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 
 	.filter-sheet button.active {

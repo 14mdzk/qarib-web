@@ -14,9 +14,16 @@ test.describe.configure({ mode: 'serial' });
 // ---------------------------------------------------------------------------
 
 async function clearLocationState(page: Page): Promise<void> {
+	if (page.url() === 'about:blank') {
+		await page.goto('/');
+	}
 	await page.evaluate(() => {
-		window.localStorage.removeItem('qarib:location-preference');
-		window.localStorage.removeItem('qarib:location:center');
+		try {
+			window.localStorage.removeItem('qarib:location-preference');
+			window.localStorage.removeItem('qarib:location:center');
+		} catch {
+			// ignore
+		}
 	});
 	// Clear the completion cookie.
 	await page.context().clearCookies();
@@ -54,7 +61,7 @@ async function setCompletionCookie(page: Page): Promise<void> {
 test('landing page loads without location marker', async ({ page }) => {
 	await clearLocationState(page);
 	await page.goto('/');
-	await expect(page.locator('text=Qarib')).toBeVisible();
+	await expect(page.locator('text=Qarib').first()).toBeVisible();
 	await expect(page).not.toHaveURL(/\/lokasi/);
 });
 
@@ -143,7 +150,7 @@ test('marker-recovery restores cookie without rewriting preference', async ({ pa
 	await expect(page).toHaveURL(/\/lokasi/);
 
 	// Marker-recovery mode: should show saved summary
-	await expect(page.locator('text=Lokasi tersimpan')).toBeVisible();
+	await expect(page.locator('text=Lokasi tersimpan').first()).toBeVisible();
 	await expect(page.locator('text=Kota Bandung, Jawa Barat')).toBeVisible();
 
 	// Click recovery action
