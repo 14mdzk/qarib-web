@@ -73,8 +73,7 @@ export async function accumulateRegions(
  * Accumulates all pages with `limit=100`.
  */
 export async function fetchProvinces(opts?: ApiCallOptions): Promise<RegionResponse[]> {
-	const all = await accumulateRegions({}, opts);
-	return all.filter((r) => r.location_path?.length === 1);
+	return accumulateRegions({}, opts);
 }
 
 /**
