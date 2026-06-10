@@ -52,7 +52,7 @@
 		<button class="settings-backdrop" onclick={handleClose} aria-label={m.setting_close()}></button>
 
 		<!-- Sheet -->
-		<div class="settings-sheet">
+		<div class="settings-sheet mx-auto max-w-2xl">
 			<!-- Grab handle -->
 			<div class="settings-handle" role="presentation"></div>
 
@@ -82,6 +82,7 @@
 <style>
 	/* ── Overlay ────────────────────────────────────────────────────────── */
 	.settings-overlay {
+		width: 100%;
 		position: fixed;
 		inset: 0;
 		z-index: 999;
@@ -106,7 +107,6 @@
 	.settings-sheet {
 		position: relative;
 		width: 100%;
-		max-width: 28rem;
 		background: var(--color-paper);
 		border-top-left-radius: 20px;
 		border-top-right-radius: 20px;
