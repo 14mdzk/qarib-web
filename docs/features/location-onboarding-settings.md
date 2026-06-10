@@ -80,3 +80,14 @@ Settings control is present in every app header (home and back modes). Opens as 
 bottom sheet on mobile and a centered modal on desktop. Shows current location
 summary and a "Ganti lokasi" link to `/lokasi`. No delete action, no language
 controls in v1.
+
+## Technical Implementation Details (Svelte 5 / SvelteKit)
+
+### 1. Form Submission & State Persistence
+To prevent Svelte 5 from synchronously unmounting the onboarding form during its submission (which would cancel the POST request with `Form submission canceled because the form is not connected`), the local-storage write is performed without updating the reactive `LocationPreferenceService` state on the active page. The form uses SvelteKit's progressive `use:enhance` action to submit the request client-side, and then redirects using `goto(result.location, { replaceState: true })`.
+
+### 2. Browser History Management
+Using `replaceState: true` for the onboarding redirect ensures that the onboarding `/lokasi` URL does not pollute the browser's history stack. This allows standard back-button navigation to function correctly from the map and other gated routes without immediately redirecting the user back into onboarding.
+
+### 3. Radius Filter Behavior
+In manual location mode, search is bounded by the selected city/kabupaten boundaries. The radius filter chip button remains visible alongside the subject chip on the map for UI consistency, but selecting it shows a bottom sheet description explaining that manual searching is bounded by the selected city, and all radius stepping options within the sheet are disabled.
