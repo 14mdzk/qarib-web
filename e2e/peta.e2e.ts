@@ -160,9 +160,30 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 	test.describe.configure({ mode: 'serial' });
 	test.use({ timezoneId: 'Asia/Jakarta' });
 
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(async ({ context, page }) => {
 		await setupLocationState(page);
 		await useCirebonGeolocation(page);
+		// Set completion cookie
+		await context.addCookies([
+			{
+				name: 'qarib_location_complete',
+				value: 'v1',
+				domain: 'localhost',
+				path: '/'
+			}
+		]);
+		// Pre-populate valid GPS preference in localStorage
+		await page.addInitScript(() => {
+			window.localStorage.setItem(
+				'qarib:location-preference',
+				JSON.stringify({
+					version: 1,
+					mode: 'gps',
+					savedAt: '2026-06-10T08:00:00+07:00',
+					coordinates: { lat: -6.732, lng: 108.5523 }
+				})
+			);
+		});
 	});
 
 	test('renders the map container full-bleed (no list/map toggle present)', async ({ page }) => {
@@ -523,6 +544,31 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 test.describe('/peta — browser-local date bounds', () => {
 	test.use({ timezoneId: 'America/New_York' });
+
+	test.beforeEach(async ({ context, page }) => {
+		await useCirebonGeolocation(page);
+		// Set completion cookie
+		await context.addCookies([
+			{
+				name: 'qarib_location_complete',
+				value: 'v1',
+				domain: 'localhost',
+				path: '/'
+			}
+		]);
+		// Pre-populate valid GPS preference in localStorage
+		await page.addInitScript(() => {
+			window.localStorage.setItem(
+				'qarib:location-preference',
+				JSON.stringify({
+					version: 1,
+					mode: 'gps',
+					savedAt: '2026-06-10T08:00:00+07:00',
+					coordinates: { lat: -6.732, lng: 108.5523 }
+				})
+			);
+		});
+	});
 
 	test('uses separate local offsets across DST transition day', async ({ page }) => {
 		await setupLocationState(page);

@@ -9,6 +9,12 @@ import { test, expect, type Page } from '@playwright/test';
 
 test.describe.configure({ mode: 'serial' });
 
+test.beforeEach(async ({ page }) => {
+	page.on('console', (msg) => {
+		console.log(`BROWSER LOG [${msg.type()}]: ${msg.text()}`);
+	});
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -17,14 +23,18 @@ async function clearLocationState(page: Page): Promise<void> {
 	if (page.url() === 'about:blank') {
 		await page.goto('/');
 	}
-	await page.evaluate(() => {
-		try {
-			window.localStorage.removeItem('qarib:location-preference');
-			window.localStorage.removeItem('qarib:location:center');
-		} catch {
-			// ignore
-		}
-	});
+	try {
+		await page.evaluate(() => {
+			try {
+				window.localStorage.removeItem('qarib:location-preference');
+				window.localStorage.removeItem('qarib:location:center');
+			} catch {
+				// ignore
+			}
+		});
+	} catch {
+		// Ignore SecurityError on about:blank
+	}
 	// Clear the completion cookie.
 	await page.context().clearCookies();
 }
@@ -59,6 +69,7 @@ async function setCompletionCookie(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 test('landing page loads without location marker', async ({ page }) => {
+	await page.goto('/');
 	await clearLocationState(page);
 	await page.goto('/');
 	await expect(page.locator('text=Qarib').first()).toBeVisible();
@@ -129,6 +140,7 @@ test('denied GPS requires manual city selection before save', async ({ page }) =
 // ---------------------------------------------------------------------------
 
 test('marker-recovery restores cookie without rewriting preference', async ({ page }) => {
+	await page.goto('/');
 	await clearLocationState(page);
 
 	// Pre-populate valid manual preference in localStorage
@@ -148,11 +160,9 @@ test('marker-recovery restores cookie without rewriting preference', async ({ pa
 	// Visit /peta without marker → redirect
 	await page.goto('/peta');
 	await expect(page).toHaveURL(/\/lokasi/);
-
 	// Marker-recovery mode: should show saved summary
 	await expect(page.locator('text=Lokasi tersimpan').first()).toBeVisible();
 	await expect(page.locator('text=Kota Bandung, Jawa Barat')).toBeVisible();
-
 	// Click recovery action
 	await page.click('text=Lanjutkan dengan lokasi tersimpan');
 
@@ -169,6 +179,7 @@ test('marker-recovery restores cookie without rewriting preference', async ({ pa
 // ---------------------------------------------------------------------------
 
 test('settings opens from app header and shows location summary', async ({ page }) => {
+	await page.goto('/');
 	await clearLocationState(page);
 	await setCompletionCookie(page);
 	await page.evaluate(() => {

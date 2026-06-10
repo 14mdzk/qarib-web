@@ -55,9 +55,16 @@
 				stagedMode = 'manual';
 				stagedProvince = {
 					id: pref.active.province.id,
-					name: pref.active.province.name
+					name: pref.active.province.name,
+					latitude: pref.active.province.coordinates?.lat,
+					longitude: pref.active.province.coordinates?.lng
 				} as RegionResponse;
-				stagedCity = { id: pref.active.city.id, name: pref.active.city.name } as RegionResponse;
+				stagedCity = {
+					id: pref.active.city.id,
+					name: pref.active.city.name,
+					latitude: pref.active.city.coordinates?.lat,
+					longitude: pref.active.city.coordinates?.lng
+				} as RegionResponse;
 			}
 		}
 	});
@@ -116,16 +123,12 @@
 		(stagedMode === 'gps' && stagedCoords !== null) ||
 			(stagedMode === 'manual' && stagedProvince !== null && stagedCity !== null)
 	);
-
-	// -------------------------------------------------------------------
-	// Completion
-	// -------------------------------------------------------------------
-
 	let completionError = $state(false);
 	let storageError = $state(false);
+	let submitting = $state(false);
 
-	function handleCompletion() {
-		if (!canSave) return;
+	function handleCompletion(): boolean {
+		if (!canSave) return false;
 
 		let prefData: LocationPreference;
 		const savedAt = new Date().toISOString();
@@ -141,18 +144,33 @@
 				version: 1,
 				mode: 'manual',
 				savedAt,
-				province: { id: stagedProvince.id!, name: stagedProvince.name! },
-				city: { id: stagedCity.id!, name: stagedCity.name! }
+				province: {
+					id: stagedProvince.id!,
+					name: stagedProvince.name!,
+					coordinates: {
+						lat: stagedProvince.latitude!,
+						lng: stagedProvince.longitude!
+					}
+				},
+				city: {
+					id: stagedCity.id!,
+					name: stagedCity.name!,
+					coordinates: {
+						lat: stagedCity.latitude!,
+						lng: stagedCity.longitude!
+					}
+				}
 			};
 		} else {
-			return;
+			return false;
 		}
 
 		try {
-			window.localStorage.setItem('qarib:location-preference', JSON.stringify(prefData));
+			pref.commitStaged(prefData);
+			return true;
 		} catch {
 			storageError = true;
-			return;
+			return false;
 		}
 	}
 
@@ -277,7 +295,7 @@
 							if (found) selectProvince(found);
 						}}
 					>
-						<option value="">{m.lokasi_city_placeholder()}</option>
+						<option value="">{m.lokasi_province_placeholder()}</option>
 						{#each provinces as p (p.id)}
 							<option value={p.id}>{p.name}</option>
 						{/each}
@@ -293,7 +311,7 @@
 					>
 					<select
 						id="lokasi-city"
-						class="border-line bg-paper text-ink w-full rounded-xl border px-4 py-3 text-sm"
+						class="border-line bg-paper disabled:bg-ink-1 disabled:text-ink-2 text-ink w-full rounded-xl border px-4 py-3 text-sm disabled:opacity-50"
 						value={stagedCity?.id ?? ''}
 						disabled={!stagedProvince || loadingCities}
 						onchange={(e) => {
@@ -305,7 +323,7 @@
 							}
 						}}
 					>
-						<option value="">{loadingCities ? '...' : m.lokasi_city_placeholder()}</option>
+						<option value="">{m.lokasi_city_placeholder()}</option>
 						{#each cities as c (c.id)}
 							<option value={c.id}>{c.name}</option>
 						{/each}
@@ -333,9 +351,9 @@
 					<button
 						type="submit"
 						class="bg-ink text-paper mt-2 w-full rounded-xl py-3 text-sm font-semibold disabled:opacity-40"
-						disabled={!canSave}
+						disabled={!canSave || submitting}
 					>
-						{m.lokasi_save()}
+						{submitting ? '...' : m.lokasi_save()}
 					</button>
 				</form>
 
@@ -379,8 +397,9 @@
 				<button
 					type="submit"
 					class="bg-orange text-paper w-full rounded-2xl py-3 text-sm font-semibold"
+					disabled={submitting}
 				>
-					{m.lokasi_recovery_continue()}
+					{submitting ? '...' : m.lokasi_recovery_continue()}
 				</button>
 			</form>
 			<p class="text-ink-4 mt-2 text-center text-xs">
@@ -471,9 +490,9 @@
 				<button
 					type="submit"
 					class="bg-orange text-paper mb-3 w-full rounded-2xl py-3 text-sm font-semibold disabled:opacity-40"
-					disabled={!canSave}
+					disabled={!canSave || submitting}
 				>
-					{m.lokasi_save()}
+					{submitting ? '...' : m.lokasi_save()}
 				</button>
 			</form>
 

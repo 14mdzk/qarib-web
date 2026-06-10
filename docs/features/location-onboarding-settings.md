@@ -81,6 +81,10 @@ bottom sheet on mobile and a centered modal on desktop. Shows current location
 summary and a "Ganti lokasi" link to `/lokasi`. No delete action, no language
 controls in v1.
 
+## Map Center Marker
+
+In manual location mode (when client-side geolocation/GPS is not active), `MapView` renders a custom region center marker at the coordinates of the selected region/city. This marker is a 20px orange circle with a white border and a subtle pulsing ring animation. It acts as a clear reference anchor showing the center of the user's manual search scope and is hidden dynamically when GPS mode is active to prevent overlapping with the blue user location dot.
+
 ## Technical Implementation Details (Svelte 5 / SvelteKit)
 
 ### 1. Form Submission & State Persistence
