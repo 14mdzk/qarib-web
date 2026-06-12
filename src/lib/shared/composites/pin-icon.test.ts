@@ -113,19 +113,19 @@ describe('buildPinIconHtml — tier colors', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildPinIconHtml — selected', () => {
-	it('applies scale(1.15) transform when selected=true', () => {
+	it('applies map-pin--selected CSS class when selected=true', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00', selected: true });
-		expect(html).toContain('scale(1.15)');
+		expect(html).toContain('map-pin--selected');
 	});
 
-	it('does not apply scale transform when selected=false (default)', () => {
+	it('does not apply map-pin--selected CSS class when selected=false (default)', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).not.toContain('scale(1.15)');
+		expect(html).not.toContain('map-pin--selected');
 	});
 
-	it('does not apply scale when selected is omitted', () => {
+	it('does not apply map-pin--selected CSS class when selected is omitted', () => {
 		const html = buildPinIconHtml({ tier: 'now', label: 'NOW' });
-		expect(html).not.toContain('scale(1.15)');
+		expect(html).not.toContain('map-pin--selected');
 	});
 });
 
@@ -134,24 +134,28 @@ describe('buildPinIconHtml — selected', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildPinIconHtml — pill structure', () => {
-	it('includes border-radius:16px for the pill', () => {
+	it('uses map-pin-body CSS class for the pill', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('border-radius:16px');
+		expect(html).toContain('class="map-pin-body"');
 	});
 
-	it('includes height:30px for the pill', () => {
+	it('uses map-pin-tail-outer CSS class for the outer tail', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('height:30px');
+		expect(html).toContain('class="map-pin-tail-outer"');
 	});
 
-	it('includes min-width:38px for the pill', () => {
+	it('uses map-pin-tail-inner CSS class for the inner tail', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('min-width:38px');
+		expect(html).toContain('class="map-pin-tail-inner"');
 	});
 
-	it('includes two tail divs (outer 7px + inner 5px)', () => {
+	it('includes tier-specific border-top-color for outer tail', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).toContain('border-top:7px solid');
-		expect(html).toContain('border-top:5px solid');
+		expect(html).toContain('border-top-color:var(--color-orange)');
+	});
+
+	it('includes tier-specific border-top-color for inner tail', () => {
+		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
+		expect(html).toContain('border-top-color:var(--color-pin-soon)');
 	});
 });

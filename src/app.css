@@ -243,6 +243,67 @@ html {
 	}
 }
 
+/* ─── Map pin styles (shared across pin-icon.ts and map-view.svelte) ─────── */
+/*
+ * Structural pin classes consumed by the raw HTML generated in
+ * src/lib/shared/composites/pin-icon.ts. Tier-specific colours remain inline
+ * because they vary per pin and are set at build-time.
+ *
+ * The hover scale and z-index are handled by Leaflet's zIndexOffset (see
+ * map-view.svelte renderPins).
+ */
+.map-pin {
+	display: inline-flex;
+	flex-direction: column;
+	align-items: center;
+	transition: transform 0.15s ease;
+}
+.map-pin:hover {
+	transform: scale(1.15);
+}
+.map-pin--selected {
+	transform: scale(1.15);
+}
+.map-pin-body {
+	min-width: 38px;
+	height: 30px;
+	border-radius: 16px;
+	border: 2px solid;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 9px;
+	font-size: 11px;
+	font-weight: 700;
+	font-family: inherit;
+	gap: 4px;
+	position: relative;
+	white-space: nowrap;
+}
+.map-pin-tail-outer {
+	position: absolute;
+	bottom: -7px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 0;
+	height: 0;
+	border-left: 6px solid transparent;
+	border-right: 6px solid transparent;
+	border-top: 7px solid;
+}
+.map-pin-tail-inner {
+	position: absolute;
+	bottom: -4px;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 0;
+	height: 0;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 5px solid;
+	z-index: 1;
+}
+
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */
 /*
  * Honor prefers-reduced-motion by zeroing all duration tokens and

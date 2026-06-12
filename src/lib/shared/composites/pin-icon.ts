@@ -4,15 +4,17 @@
  * Returns a raw HTML string suitable for Leaflet's `L.divIcon({ html: ... })`.
  * Kept pure (no Leaflet import, no DOM) so it is unit-testable in Vitest.
  *
- * Pin anatomy (ported 1:1 from docs/design/hifi-v2.html `.map-pin`):
- *   - A pill `.body` (height 30px, border-radius 16px, border 2px).
+ * Pin anatomy:
+ *   - A pill `.map-pin-body` (height 30px, border-radius 16px, border 2px).
  *   - A downward ink triangle tail implemented as two nested border-trick divs
- *     (::after outer / ::before fill) since divIcon is raw HTML with no
- *     pseudo-element support.
+ *     (`.map-pin-tail-outer` / `.map-pin-tail-inner`) since divIcon is raw HTML
+ *     with no pseudo-element support.
+ *   - Structural styles are in CSS classes (`map-pin`, `map-pin-body`, etc.)
+ *     defined in app.css. Tier-specific colors are kept as inline styles since
+ *     they are dynamic per-pin.
  *
  * Caller supplies `label` (e.g. "18:00", "NOW", "Besok") and `tier`.
- * The `now` tier prepends "● " to the label per v2 spec (`.body` renders
- * `●&nbsp;label`).
+ * The `now` tier prepends "● " to the label per v2 spec.
  */
 
 import type { PinTier } from '$domains/events/pin-tier.js';
@@ -33,11 +35,12 @@ export interface PinIconOptions {
 	selected?: boolean;
 }
 
-// Per-tier inline style strings — values map directly to app.css tokens.
+// Per-tier body style — values that vary by tier (background, border-color,
+// color, box-shadow). The rest of the body styling is in CSS class .map-pin-body.
 // now:   orange fill, orange-700 border, white text, warm ring shadow.
-// soon:  orange-50 fill (#fce4c7), orange border, orange-700 text.
-// today: paper-white fill (#fdfaf4), ink border, ink text.
-// later: paper-2 fill (#f7f1e5), ink-4 border, ink-3 text, fw 600.
+// soon:  orange-50 fill, orange border, orange-700 text.
+// today: paper-white fill, ink border, ink text.
+// later: paper-2 fill, ink-4 border, ink-3 text, fw 600.
 const TIER_BODY_STYLE: Record<PinTier, string> = {
 	now: [
 		'background:var(--color-pin-now)',
@@ -83,65 +86,29 @@ const TIER_TAIL_INNER: Record<PinTier, string> = {
 };
 
 /**
- * Build the HTML string for a v2 `.map-pin` divIcon.
+ * Build the HTML string for a v2 map pin divIcon.
  *
- * The returned string is a single wrapper `<div>` containing the pill body
- * and two nested tail divs (outer ink triangle, inner fill triangle).
+ * The returned string is a single wrapper `<div class="map-pin">` containing
+ * the pill body and two nested tail divs (outer ink triangle, inner fill
+ * triangle). Structural positioning is in CSS classes; tier-specific colors
+ * are inline since they vary per pin.
  *
- * `selected` wraps the whole element at `transform:scale(1.15)`.
+ * `selected` adds the `.map-pin--selected` class which applies transform:scale(1.15).
  */
 export function buildPinIconHtml({ tier, label, selected = false }: PinIconOptions): string {
 	const safeLabel = escapeHtml(label);
 	const displayLabel = tier === 'now' ? `&#9679;&nbsp;${safeLabel}` : safeLabel;
 
-	// Outer ink tail (border trick: 6px wide, 7px tall)
-	const tailOuter = `<div style="${[
-		'position:absolute',
-		'bottom:-7px',
-		'left:50%',
-		'transform:translateX(-50%)',
-		'width:0',
-		'height:0',
-		'border-left:6px solid transparent',
-		'border-right:6px solid transparent',
-		`border-top:7px solid ${TIER_TAIL_OUTER[tier]}`
-	].join(';')}"></div>`;
+	// Outer ink tail — border-top-color is tier-specific (inline).
+	const tailOuter = `<div class="map-pin-tail-outer" style="border-top-color:${TIER_TAIL_OUTER[tier]}"></div>`;
 
-	// Inner fill tail (border trick: 4px wide, 5px tall; z-index:1 above outer)
-	const tailInner = `<div style="${[
-		'position:absolute',
-		'bottom:-4px',
-		'left:50%',
-		'transform:translateX(-50%)',
-		'width:0',
-		'height:0',
-		'border-left:4px solid transparent',
-		'border-right:4px solid transparent',
-		`border-top:5px solid ${TIER_TAIL_INNER[tier]}`,
-		'z-index:1'
-	].join(';')}"></div>`;
+	// Inner fill tail — border-top-color is tier-specific (inline).
+	const tailInner = `<div class="map-pin-tail-inner" style="border-top-color:${TIER_TAIL_INNER[tier]}"></div>`;
 
-	const bodyStyle = [
-		'min-width:38px',
-		'height:30px',
-		'border-radius:16px',
-		'border:2px solid',
-		'display:flex',
-		'align-items:center',
-		'justify-content:center',
-		'padding:0 9px',
-		'font-size:11px',
-		'font-weight:700',
-		'font-family:inherit',
-		'gap:4px',
-		'position:relative',
-		'white-space:nowrap',
-		TIER_BODY_STYLE[tier]
-	].join(';');
+	// Body — only tier-varying props are inline; structural props are in CSS.
+	const bodyHtml = `<div class="map-pin-body" style="${TIER_BODY_STYLE[tier]}">${displayLabel}${tailOuter}${tailInner}</div>`;
 
-	const wrapStyle = selected
-		? 'transform:scale(1.15);display:inline-flex;flex-direction:column;align-items:center'
-		: 'display:inline-flex;flex-direction:column;align-items:center';
+	const wrapperClass = `map-pin${selected ? ' map-pin--selected' : ''}`;
 
-	return `<div style="${wrapStyle}"><div style="${bodyStyle}">${displayLabel}${tailOuter}${tailInner}</div></div>`;
+	return `<div class="${wrapperClass}">${bodyHtml}</div>`;
 }

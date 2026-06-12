@@ -46,6 +46,7 @@ export interface FuturePlaceSuggestion {
 
 interface NearbyPlaceCoordinates {
 	id?: string | null;
+	name?: Record<string, string> | string | null;
 	lat?: number | null;
 	lng?: number | null;
 }
@@ -252,7 +253,7 @@ export function mergeNearbyPlacesWithEventPins(
 			lat,
 			lng,
 			tier: 'later',
-			label: placeLabel
+			label: localizedName(place.name) || placeLabel
 		});
 	}
 

@@ -218,6 +218,12 @@
 			marker.on('click', () => {
 				onpinclick?.(pin.id);
 			});
+			marker.on('mouseover', () => {
+				marker.setZIndexOffset(9999);
+			});
+			marker.on('mouseout', () => {
+				marker.setZIndexOffset(0);
+			});
 			pinLayerGroup.addLayer(marker);
 		}
 	}

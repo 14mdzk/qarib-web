@@ -124,7 +124,13 @@
 
 	const filteredKajianList = $derived.by(() => {
 		if (!activeCalendarDate) return null;
-		return kajianList;
+		// Get event_ids from calendar occurrences on the clicked date
+		const occurrencesOnDate = (calendarQuery.data?.data ?? []).filter(
+			(occ) => occ.date_start?.substring(0, 10) === activeCalendarDate
+		);
+		const seriesIdsOnDate = new Set(occurrencesOnDate.map((occ) => occ.event_id));
+		// Filter the series list to matching series
+		return kajianList.filter((series) => seriesIdsOnDate.has(series.id));
 	});
 </script>
 
@@ -360,13 +366,19 @@
 				</div>
 
 				<div class="flex flex-col gap-2">
-					{#each filteredKajianList ?? kajianList as series (series.id)}
-						<EventCard {series} />
-					{:else}
+					{#if activeCalendarDate && (filteredKajianList ?? []).length === 0}
 						<div class="border-line rounded border p-4 text-center">
 							<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
 						</div>
-					{/each}
+					{:else}
+						{#each filteredKajianList ?? kajianList as series (series.id)}
+							<EventCard {series} />
+						{:else}
+							<div class="border-line rounded border p-4 text-center">
+								<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
+							</div>
+						{/each}
+					{/if}
 				</div>
 			</div>
 		</div>

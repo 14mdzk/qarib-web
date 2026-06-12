@@ -91,6 +91,21 @@
 		currentAnchor = shiftCalendarMonth(currentAnchor, 1);
 	}
 
+	/**
+	 * Handle a day cell click.
+	 * If the clicked cell is not in the current month, navigate to that month
+	 * first. Always calls onDateClick so the caller can react to the selection.
+	 */
+	function handleCellClick(cell: CalendarDay) {
+		if (!cell.isCurrentMonth) {
+			// Derive the first of the clicked cell's month.
+			const [year, month] = cell.isoDate.split('-').map(Number);
+			const monthAnchor = `${year}-${String(month).padStart(2, '0')}-01`;
+			currentAnchor = monthAnchor;
+		}
+		onDateClick?.(cell.isoDate);
+	}
+
 	// ---------------------------------------------------------------------------
 	// Keyboard navigation on the grid
 	// ---------------------------------------------------------------------------
@@ -259,7 +274,7 @@
 							: m.calendar_date_label({ date: cell.isoDate })}
 						aria-current={cell.isToday ? 'date' : undefined}
 						data-testid="calendar-day"
-						onclick={() => onDateClick?.(cell.isoDate)}
+						onclick={() => handleCellClick(cell)}
 					>
 						<span class={cn('leading-none', !cell.isCurrentMonth && 'opacity-40')}>
 							{cell.day}

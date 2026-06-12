@@ -189,7 +189,7 @@ describe('mergeNearbyPlacesWithEventPins', () => {
 
 		expect(pins).toEqual([
 			{ id: 'place-a', lat: -6.732, lng: 108.552, tier: 'today', label: '13:00' },
-			{ id: 'place-b', lat: -6.74, lng: 108.561, tier: 'later', label: 'Masjid' }
+			{ id: 'place-b', lat: -6.74, lng: 108.561, tier: 'later', label: 'Masjid B' }
 		]);
 	});
 });
