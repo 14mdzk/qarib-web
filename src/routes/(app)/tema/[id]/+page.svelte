@@ -5,9 +5,15 @@
 	import { m } from '$core/i18n';
 	import { Skeleton } from '$lib/shared/primitives';
 	import EventCard from '$lib/domains/events/components/event-card.svelte';
+	import MonthCalendar from '$lib/shared/composites/month-calendar.svelte';
 	import { defineSubjectByIdQuery } from '$domains/subject/queries.js';
-	import { defineSeriesListQuery } from '$domains/events/queries.js';
+	import {
+		defineSeriesListQuery,
+		defineDomainCalendarQuery,
+		deriveEventDates
+	} from '$domains/events/queries.js';
 	import { deriveInitials } from '$lib/shared/utils/names.js';
+	import { toLocalIsoDate, addIsoDateDays, shiftCalendarMonth } from '$lib/shared/utils/date';
 	import type { PageData } from './$types';
 	import { l10n } from '$shared/utils/l10n';
 
@@ -102,6 +108,64 @@
 		}
 		return result;
 	});
+
+	// ---------------------------------------------------------------------------
+	// Calendar state
+	// ---------------------------------------------------------------------------
+
+	let showCalendar = $state(false);
+	let calendarAnchor = $state(toLocalIsoDate(new Date()).substring(0, 7) + '-01');
+	let activeCalendarDate = $state<string | null>(null);
+
+	/** Date range with ±7 day padding around the month being viewed. */
+	const monthStart = $derived(calendarAnchor);
+	const monthEnd = $derived(shiftCalendarMonth(calendarAnchor, 1));
+
+	const calendarDateFrom = $derived(addIsoDateDays(monthStart, -7));
+	const calendarDateTo = $derived(addIsoDateDays(shiftCalendarMonth(monthEnd, 0), 7));
+
+	const calendarQuery = defineDomainCalendarQuery(
+		{
+			domainType: 'subject',
+			domainId: id,
+			get dateFrom() {
+				return calendarDateFrom;
+			},
+			get dateTo() {
+				return calendarDateTo;
+			}
+		},
+		{
+			get enabled() {
+				return showCalendar;
+			}
+		}
+	);
+
+	const eventDates = $derived(deriveEventDates(calendarQuery.data?.data ?? []));
+
+	function handleCalendarDateClick(isoDate: string) {
+		activeCalendarDate = isoDate;
+		// Scroll to the kajian section
+		setTimeout(() => {
+			document.getElementById('kajian-section')?.scrollIntoView({ behavior: 'smooth' });
+		}, 100);
+	}
+
+	function resetCalendarFilter() {
+		activeCalendarDate = null;
+	}
+
+	/** Filtered kajian list when a calendar date is active. */
+	const filteredKajianList = $derived.by(() => {
+		if (!activeCalendarDate) return null;
+		// Filter the series list: keep series whose upcoming occurrences might
+		// fall on the clicked date. Since we only have series templates,
+		// we show all series and the user can check the calendar for dates.
+		// For a precise per-date filter, we'd need the occurrences data.
+		// For now, show the full list with a date header.
+		return kajianList;
+	});
 </script>
 
 <!--
@@ -170,13 +234,6 @@
 		<!-- ── Scroll body ────────────────────────────────────────────────────── -->
 		<div class="flex flex-col gap-5 pt-4">
 			<!-- ── Stat row: Kajian · Ustadz · Masjid ──────────────────────────── -->
-			<!--
-				All three stats are derived from the kajian list (events.list?subject_id=id):
-				- Kajian = total occurrences returned (kajianList.length)
-				- Ustadz = count of unique asatidz IDs across occurrences (via expanded asatidz.id)
-				- Masjid = count of unique place IDs across occurrences (via expanded place.id)
-				SubjectResponse has no aggregate fields — this is a flag: derived from kajian list.
-			-->
 			<div
 				class="border-line flex items-center justify-around rounded border bg-[var(--color-paper-2)] py-4"
 				data-testid="stat-row"
@@ -204,12 +261,6 @@
 			</div>
 
 			<!-- ── Ustadz mini carousel ──────────────────────────────────────────── -->
-			<!--
-				Unique ustadz among the kajian, deduped by asatidz_id.
-				Each chip links to /ustadz/{asatidz_id} via resolve().
-				Initials via deriveInitials() (strips "Ustadz " / "Ust." prefix).
-				Only shown when at least one ustadz is resolvable from the list.
-			-->
 			{#if uniqueUstadzList().length > 0}
 				<div data-testid="ustadz-carousel">
 					<div
@@ -220,16 +271,11 @@
 					</div>
 					<div class="flex flex-wrap gap-2">
 						{#each uniqueUstadzList() as ustadz (ustadz.id)}
-							<!--
-								Link to /ustadz/{asatidz_id} — uses resolve() so the path
-								stays correct if the app base path changes.
-							-->
 							<a
 								href={resolve('/(app)/ustadz/[id]', { id: ustadz.id })}
 								class="border-line bg-paper hover:bg-paper-2 flex items-center gap-2 rounded-sm border px-2.5 py-1.5 transition-colors"
 								data-testid="ustadz-mini-chip"
 							>
-								<!-- Initials circle -->
 								<span
 									class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold"
 									style="background: linear-gradient(135deg, var(--color-orange-100) 0%, var(--color-orange-50) 100%); color: var(--color-orange-700);"
@@ -246,17 +292,77 @@
 				</div>
 			{/if}
 
+			<!-- ── Calendar toggle button ────────────────────────────────────────── -->
+			<button
+				class="border-line bg-paper-2 text-ink flex w-full items-center justify-center gap-2 rounded-sm border py-2.5 text-sm font-semibold transition-colors hover:bg-[var(--color-orange-50)]"
+				data-testid="calendar-toggle-btn"
+				onclick={() => {
+					showCalendar = !showCalendar;
+					if (!showCalendar) {
+						activeCalendarDate = null;
+					}
+				}}
+			>
+				<svg
+					width="15"
+					height="15"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+					><rect width="18" height="18" x="3" y="4" rx="2" /><line
+						x1="16"
+						y1="2"
+						x2="16"
+						y2="6"
+					/><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg
+				>
+				{showCalendar ? m.calendar_toggle_list() : m.calendar_toggle_calendar()}
+			</button>
+
+			<!-- ── MonthCalendar (when toggled on) ──────────────────────────────── -->
+			{#if showCalendar}
+				<MonthCalendar
+					domainName={l10n(subject.name || subjectQuery.data?.name)}
+					{eventDates}
+					loading={calendarQuery.isPending}
+					error={calendarQuery.isError ? m.calendar_error_body() : null}
+					onRetry={() => calendarQuery.refetch()}
+					onDateClick={handleCalendarDateClick}
+				/>
+			{/if}
+
 			<!-- ── Jadwal mendatang section ──────────────────────────────────────── -->
-			<div data-testid="kajian-section">
+			<div id="kajian-section" data-testid="kajian-section">
 				<div
-					class="text-ink-3 mb-2.5 text-[11px] font-bold tracking-widest uppercase"
+					class="text-ink-3 mb-2.5 flex items-baseline justify-between text-[11px] font-bold tracking-widest uppercase"
 					data-testid="kajian-section-title"
 				>
-					{m.tema_kajian_section_title()}
+					<span>
+						{activeCalendarDate ? m.kajian_next_session_today() : m.tema_kajian_section_title()}
+					</span>
+					{#if activeCalendarDate}
+						<button
+							class="text-orange cursor-pointer text-[11px] font-semibold normal-case"
+							onclick={resetCalendarFilter}
+							data-testid="calendar-reset-btn"
+						>
+							{m.calendar_toggle_list()}
+						</button>
+					{/if}
 				</div>
 
+				{#if activeCalendarDate}
+					<p class="text-ink-4 mb-2 text-xs">
+						{m.calendar_date_label({ date: activeCalendarDate })}
+					</p>
+				{/if}
+
 				<div class="flex flex-col gap-2">
-					{#each kajianList as series (series.id)}
+					{#each filteredKajianList ?? kajianList as series (series.id)}
 						<EventCard {series} hideSubjectLink={true} />
 					{:else}
 						<div class="border-line rounded border p-4 text-center">

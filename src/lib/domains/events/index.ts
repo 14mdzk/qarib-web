@@ -54,8 +54,12 @@ export {
 	defineSeriesRecurringsQuery,
 	defineSeriesByIdQuery,
 	defineOccurrencesByEventQuery,
-	defineSeriesListQuery
+	defineSeriesListQuery,
+	defineDomainCalendarQuery,
+	deriveEventDates
 } from './queries.js';
+
+export type { DomainCalendarArgs } from './queries.js';
 
 export { deriveTier, tierToTokenColor } from './pin-tier.js';
 export type { PinTier } from './pin-tier.js';

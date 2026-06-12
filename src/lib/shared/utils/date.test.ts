@@ -9,7 +9,9 @@ import {
 	shiftCalendarMonth,
 	getWeekdayLabels,
 	addIsoDateDays,
-	formatIsoDate
+	formatIsoDate,
+	getMonthGrid,
+	getMonthYearLabel
 } from './date.js';
 
 const ORIGINAL_TZ = process.env.TZ;
@@ -164,5 +166,80 @@ describe('getRelativeDateLabel', () => {
 		const result = getRelativeDateLabel(dateStr, now);
 		expect(result).toContain(expected3DaysOut);
 		expect(result).toMatch(/09:00/);
+	});
+});
+
+describe('getMonthGrid', () => {
+	it('returns exactly 42 cells (6 weeks x 7 days)', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-06-01');
+		expect(cells).toHaveLength(42);
+	});
+
+	it('first cell is a Sunday', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-06-01');
+		// 2026-06-01 is a Monday, so the first cell should be 2026-05-31 (Sunday)
+		expect(cells[0].isoDate).toBe('2026-05-31');
+		expect(cells[0].day).toBe(31);
+		expect(cells[0].isCurrentMonth).toBe(false);
+	});
+
+	it('last cell is a Saturday', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-06-01');
+		// 42nd cell from May 31 is 2026-07-11
+		expect(cells[41].isoDate).toBe('2026-07-11');
+		expect(cells[41].day).toBe(11);
+		expect(cells[41].isCurrentMonth).toBe(false);
+	});
+
+	it('marks current-month cells correctly for June 2026', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-06-01');
+		const currentMonthCells = cells.filter((c) => c.isCurrentMonth);
+		// June has 30 days
+		expect(currentMonthCells).toHaveLength(30);
+		expect(currentMonthCells[0].isoDate).toBe('2026-06-01');
+		expect(currentMonthCells[29].isoDate).toBe('2026-06-30');
+	});
+
+	it('marks isToday when a cell matches the current date', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-06-01');
+		const todayLocal = new Date();
+		const todayIso = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, '0')}-${String(todayLocal.getDate()).padStart(2, '0')}`;
+		const todayCell = cells.find((c) => c.isToday);
+		if (todayCell) {
+			expect(todayCell.isoDate).toBe(todayIso);
+		}
+	});
+
+	it('pads January 2026 correctly (starts on Thursday)', () => {
+		process.env.TZ = 'Asia/Jakarta';
+		const cells = getMonthGrid('2026-01-01');
+		// 2026-01-01 is Thursday, so first cell should be Dec 28 (Sunday)
+		expect(cells[0].isoDate).toBe('2025-12-28');
+		expect(cells[0].isCurrentMonth).toBe(false);
+		// Jan 1 should be at index 4 (Sun=0, Mon=1, Tue=2, Wed=3, Thu=4)
+		expect(cells[4].isoDate).toBe('2026-01-01');
+		expect(cells[4].isCurrentMonth).toBe(true);
+	});
+});
+
+describe('getMonthYearLabel', () => {
+	it('returns Indonesian month and year format', () => {
+		const label = getMonthYearLabel('2026-06-01');
+		expect(label).toBe('Juni 2026');
+	});
+
+	it('handles January correctly', () => {
+		const label = getMonthYearLabel('2026-01-15');
+		expect(label).toBe('Januari 2026');
+	});
+
+	it('handles December correctly', () => {
+		const label = getMonthYearLabel('2026-12-25');
+		expect(label).toBe('Desember 2026');
 	});
 });

@@ -211,5 +211,17 @@
 	"setting_mode_current": "Mode saat ini",
 	"setting_ganti_lokasi": "Ganti lokasi",
 	"setting_close": "Tutup",
-	"lokasi_recovery_replace": "Ganti lokasi"
+	"lokasi_recovery_replace": "Ganti lokasi",
+
+	"calendar_title": "Kalender {domain}",
+	"calendar_prev_month": "Bulan sebelumnya",
+	"calendar_next_month": "Bulan berikutnya",
+	"calendar_loading": "Memuat kalender…",
+	"calendar_empty": "Tidak ada kajian di bulan ini",
+	"calendar_error_title": "Kalender tidak bisa dimuat",
+	"calendar_error_body": "Periksa sambunganmu lalu coba lagi.",
+	"calendar_date_label": "Pilih {date}",
+	"calendar_today_label": "Hari ini, {date}",
+	"calendar_toggle_list": "Lihat daftar",
+	"calendar_toggle_calendar": "Lihat kalender"
 }

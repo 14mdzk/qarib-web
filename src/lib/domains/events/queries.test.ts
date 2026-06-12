@@ -11,10 +11,11 @@ import {
 	buildNextPageArgs,
 	buildNearbyQueryOptions,
 	eventKeys,
-	nearbyNextPageParam
+	nearbyNextPageParam,
+	deriveEventDates
 } from './queries.js';
-import type { Paginated } from '$core/api';
 import type { EventRecurringResponse } from './schema.js';
+import type { Paginated } from '$core/api';
 
 // ---------------------------------------------------------------------------
 // nearbyNextPageParam — getNextPageParam for the infinite query
@@ -130,5 +131,61 @@ describe('buildNearbyQueryOptions', () => {
 	it('sets staleTime when provided', () => {
 		const opts = buildNearbyQueryOptions({}, { staleTime: 60_000 });
 		expect(opts.staleTime).toBe(60_000);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// eventKeys — domainCalendar
+// ---------------------------------------------------------------------------
+
+describe('eventKeys.domainCalendar', () => {
+	it('constructs the query key with domainType, domainId, dateFrom, dateTo', () => {
+		const key = eventKeys.domainCalendar({
+			domainType: 'subject',
+			domainId: 'uuid-123',
+			dateFrom: '2026-06-01',
+			dateTo: '2026-07-15'
+		});
+		expect(key[0]).toBe('events');
+		expect(key[1]).toBe('domainCalendar');
+		expect(key[2]).toEqual({
+			domainType: 'subject',
+			domainId: 'uuid-123',
+			dateFrom: '2026-06-01',
+			dateTo: '2026-07-15'
+		});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// deriveEventDates
+// ---------------------------------------------------------------------------
+
+describe('deriveEventDates', () => {
+	it('extracts unique ISO dates from occurrences', () => {
+		const occurrences = [
+			{ date_start: '2026-06-01T07:00:00+07:00' },
+			{ date_start: '2026-06-03T07:00:00+07:00' },
+			{ date_start: '2026-06-01T10:00:00+07:00' }
+		] as EventRecurringResponse[];
+		const dates = deriveEventDates(occurrences);
+		expect(dates.size).toBe(2);
+		expect(dates.has('2026-06-01')).toBe(true);
+		expect(dates.has('2026-06-03')).toBe(true);
+	});
+
+	it('handles empty list', () => {
+		const dates = deriveEventDates([]);
+		expect(dates.size).toBe(0);
+	});
+
+	it('skips occurrences with missing date_start', () => {
+		const occurrences = [
+			{ date_start: undefined },
+			{ date_start: '2026-06-15T07:00:00+07:00' }
+		] as unknown as EventRecurringResponse[];
+		const dates = deriveEventDates(occurrences);
+		expect(dates.size).toBe(1);
+		expect(dates.has('2026-06-15')).toBe(true);
 	});
 });
