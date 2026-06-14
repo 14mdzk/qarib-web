@@ -335,6 +335,7 @@
 					{eventDates}
 					loading={calendarQuery.isPending}
 					error={calendarQuery.isError ? m.calendar_error_body() : null}
+					activeDate={activeCalendarDate}
 					onRetry={() => calendarQuery.refetch()}
 					onDateClick={handleCalendarDateClick}
 				/>

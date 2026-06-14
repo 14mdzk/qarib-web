@@ -28,6 +28,7 @@
 		eventDates = new Set<string>(),
 		loading = false,
 		error = null as string | null,
+		activeDate = null as string | null,
 		onRetry = undefined as (() => void) | undefined,
 		onDateClick = undefined as ((isoDate: string) => void) | undefined
 	}: {
@@ -35,6 +36,7 @@
 		eventDates?: Set<string>;
 		loading?: boolean;
 		error?: string | null;
+		activeDate?: string | null;
 		onRetry?: () => void;
 		onDateClick?: (isoDate: string) => void;
 	} = $props();
@@ -264,7 +266,9 @@
 							'relative flex aspect-square w-full flex-col items-center justify-center rounded-sm text-xs font-medium transition-colors',
 							'focus-visible:outline-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
 							cell.isCurrentMonth ? 'text-ink hover:bg-[var(--color-orange-50)]' : 'text-ink-4',
-							cell.isToday && 'ring-ink ring-1'
+							cell.isToday && !activeDate && 'ring-ink ring-1',
+							cell.isoDate === activeDate && 'ring-orange bg-[var(--color-orange-50)] ring-1',
+							activeDate && cell.isToday && cell.isoDate === activeDate && 'ring-orange'
 						)}
 						role="gridcell"
 						tabindex={grid.indexOf(cell) === 0 ? 0 : -1}
