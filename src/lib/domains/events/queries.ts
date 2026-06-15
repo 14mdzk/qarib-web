@@ -390,7 +390,7 @@ function domainCalendarFilterArgs(args: DomainCalendarArgs): ListArgs {
 		...filterField,
 		date_from: args.dateFrom,
 		date_to: args.dateTo,
-		limit: 200
+		limit: 100
 	};
 }
 
