@@ -58,53 +58,83 @@ describe('buildPinIconHtml — label', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Per-tier color vars
+// Per-tier CSS classes (replaces old inline-style checks)
 // ---------------------------------------------------------------------------
 
-describe('buildPinIconHtml — tier colors', () => {
-	it('now: contains --color-pin-now background', () => {
+describe('buildPinIconHtml — tier CSS classes', () => {
+	it('now: body uses map-pin-body--now class', () => {
 		const html = buildPinIconHtml({ tier: 'now', label: 'NOW' });
-		expect(html).toContain('var(--color-pin-now)');
+		expect(html).toContain('map-pin-body--now');
 	});
 
-	it('now: contains --color-orange-700 border (tail outer)', () => {
+	it('now: tail outer uses map-pin-tail-outer--now class', () => {
 		const html = buildPinIconHtml({ tier: 'now', label: 'NOW' });
-		expect(html).toContain('var(--color-orange-700)');
+		expect(html).toContain('map-pin-tail-outer--now');
 	});
 
-	it('soon: contains --color-pin-soon background', () => {
+	it('now: tail inner uses map-pin-tail-inner--now class', () => {
+		const html = buildPinIconHtml({ tier: 'now', label: 'NOW' });
+		expect(html).toContain('map-pin-tail-inner--now');
+	});
+
+	it('soon: body uses map-pin-body--soon class', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).toContain('var(--color-pin-soon)');
+		expect(html).toContain('map-pin-body--soon');
 	});
 
-	it('soon: contains --color-orange border', () => {
+	it('soon: tail outer uses map-pin-tail-outer--soon class', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).toContain('var(--color-orange)');
+		expect(html).toContain('map-pin-tail-outer--soon');
 	});
 
-	it('today: contains --color-pin-today background', () => {
+	it('soon: tail inner uses map-pin-tail-inner--soon class', () => {
+		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
+		expect(html).toContain('map-pin-tail-inner--soon');
+	});
+
+	it('today: body uses map-pin-body--today class', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '20:00' });
-		expect(html).toContain('var(--color-pin-today)');
+		expect(html).toContain('map-pin-body--today');
 	});
 
-	it('today: contains --color-ink border', () => {
+	it('today: tail outer uses map-pin-tail-outer--today class', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '20:00' });
-		expect(html).toContain('var(--color-ink)');
+		expect(html).toContain('map-pin-tail-outer--today');
 	});
 
-	it('later: contains --color-paper-2 background', () => {
-		const html = buildPinIconHtml({ tier: 'later', label: 'Besok' });
-		expect(html).toContain('var(--color-paper-2)');
+	it('today: tail inner uses map-pin-tail-inner--today class', () => {
+		const html = buildPinIconHtml({ tier: 'today', label: '20:00' });
+		expect(html).toContain('map-pin-tail-inner--today');
 	});
 
-	it('later: contains --color-ink-4 border', () => {
+	it('later: body uses map-pin-body--later class', () => {
 		const html = buildPinIconHtml({ tier: 'later', label: 'Besok' });
-		expect(html).toContain('var(--color-ink-4)');
+		expect(html).toContain('map-pin-body--later');
 	});
 
-	it('later: contains --color-ink-3 text color', () => {
+	it('later: tail outer uses map-pin-tail-outer--later class', () => {
 		const html = buildPinIconHtml({ tier: 'later', label: 'Besok' });
-		expect(html).toContain('var(--color-ink-3)');
+		expect(html).toContain('map-pin-tail-outer--later');
+	});
+
+	it('later: tail inner uses map-pin-tail-inner--later class', () => {
+		const html = buildPinIconHtml({ tier: 'later', label: 'Besok' });
+		expect(html).toContain('map-pin-tail-inner--later');
+	});
+
+	it('rejects inline style attribute on body', () => {
+		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
+		expect(html).not.toMatch(/class="map-pin-body" style=/);
+	});
+
+	it('rejects inline style attribute on tail outer', () => {
+		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
+		expect(html).not.toMatch(/class="map-pin-tail-outer" style=/);
+	});
+
+	it('rejects inline style attribute on tail inner', () => {
+		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
+		expect(html).not.toMatch(/class="map-pin-tail-inner" style=/);
 	});
 });
 
@@ -113,19 +143,19 @@ describe('buildPinIconHtml — tier colors', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildPinIconHtml — selected', () => {
-	it('applies scale(1.15) transform when selected=true', () => {
+	it('applies map-pin--selected CSS class when selected=true', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00', selected: true });
-		expect(html).toContain('scale(1.15)');
+		expect(html).toContain('map-pin--selected');
 	});
 
-	it('does not apply scale transform when selected=false (default)', () => {
+	it('does not apply map-pin--selected CSS class when selected=false (default)', () => {
 		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).not.toContain('scale(1.15)');
+		expect(html).not.toContain('map-pin--selected');
 	});
 
-	it('does not apply scale when selected is omitted', () => {
+	it('does not apply map-pin--selected CSS class when selected is omitted', () => {
 		const html = buildPinIconHtml({ tier: 'now', label: 'NOW' });
-		expect(html).not.toContain('scale(1.15)');
+		expect(html).not.toContain('map-pin--selected');
 	});
 });
 
@@ -134,24 +164,33 @@ describe('buildPinIconHtml — selected', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildPinIconHtml — pill structure', () => {
-	it('includes border-radius:16px for the pill', () => {
+	it('uses map-pin-body CSS class for the pill', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('border-radius:16px');
+		expect(html).toContain('class="map-pin-body');
 	});
 
-	it('includes height:30px for the pill', () => {
+	it('uses map-pin-tail-outer CSS class for the outer tail', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('height:30px');
+		expect(html).toContain('class="map-pin-tail-outer');
 	});
 
-	it('includes min-width:38px for the pill', () => {
+	it('uses map-pin-tail-inner CSS class for the inner tail', () => {
 		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
-		expect(html).toContain('min-width:38px');
+		expect(html).toContain('class="map-pin-tail-inner');
 	});
 
-	it('includes two tail divs (outer 7px + inner 5px)', () => {
-		const html = buildPinIconHtml({ tier: 'soon', label: '18:00' });
-		expect(html).toContain('border-top:7px solid');
-		expect(html).toContain('border-top:5px solid');
+	it('body class includes tier variant', () => {
+		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
+		expect(html).toContain('class="map-pin-body map-pin-body--today"');
+	});
+
+	it('outer tail class includes tier variant', () => {
+		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
+		expect(html).toContain('class="map-pin-tail-outer map-pin-tail-outer--today"');
+	});
+
+	it('inner tail class includes tier variant', () => {
+		const html = buildPinIconHtml({ tier: 'today', label: '19:30' });
+		expect(html).toContain('class="map-pin-tail-inner map-pin-tail-inner--today"');
 	});
 });

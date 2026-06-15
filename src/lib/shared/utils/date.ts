@@ -102,3 +102,59 @@ export function getRelativeDateLabel(dateStr: string, now: Date = new Date()): s
 	const dayName = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(date);
 	return `${dayName}, ${time}`;
 }
+
+// ---------------------------------------------------------------------------
+// Calendar grid helpers
+// ---------------------------------------------------------------------------
+
+export interface CalendarDay {
+	isoDate: string; // "2026-06-01"
+	day: number; // 1-31
+	isCurrentMonth: boolean;
+	isToday: boolean;
+}
+
+/**
+ * Generate 42 CalendarDay cells (6 weeks x 7 days, Sunday-start).
+ * Pads the start to the preceding Sunday and end to the following Saturday.
+ * `isToday` compares against the current local date.
+ */
+export function getMonthGrid(anchorDate: string): CalendarDay[] {
+	const [anchorYear, anchorMonth] = isoDateParts(anchorDate);
+
+	// First day of the anchor month
+	const firstOfMonth = new Date(anchorYear, anchorMonth - 1, 1, 12);
+
+	// Find the preceding Sunday (0 = Sunday)
+	const firstWeekday = firstOfMonth.getDay(); // 0 = Sun
+	const startDate = new Date(firstOfMonth);
+	startDate.setDate(startDate.getDate() - firstWeekday);
+
+	const todayLocal = toLocalIsoDate(new Date());
+
+	const cells: CalendarDay[] = [];
+	for (let i = 0; i < 42; i++) {
+		const cellDate = new Date(startDate);
+		cellDate.setDate(startDate.getDate() + i);
+		const isoDate = toLocalIsoDate(cellDate);
+		cells.push({
+			isoDate,
+			day: cellDate.getDate(),
+			isCurrentMonth: cellDate.getMonth() === anchorMonth - 1,
+			isToday: isoDate === todayLocal
+		});
+	}
+
+	return cells;
+}
+
+/**
+ * Format a date string as "Bulan Tahun" in the given locale (default id-ID).
+ * Example: "Juni 2026"
+ */
+export function getMonthYearLabel(dateStr: string, locale = 'id-ID'): string {
+	const [year, month] = isoDateParts(dateStr);
+	return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(
+		new Date(year, month - 1, 1, 12)
+	);
+}

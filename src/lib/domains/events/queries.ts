@@ -46,7 +46,13 @@ export const eventKeys = {
 	seriesUpcoming: (args: SeriesPaginatedArgs) => ['events', 'seriesUpcoming', args] as const,
 	seriesRecurrings: (args: SeriesPaginatedArgs) => ['events', 'seriesRecurrings', args] as const,
 	occurrencesByEvent: (args: ListArgs) => ['events', 'occurrencesByEvent', args] as const,
-	listSeries: (args: ListSeriesArgs) => ['events', 'listSeries', args] as const
+	listSeries: (args: ListSeriesArgs) => ['events', 'listSeries', args] as const,
+	domainCalendar: (args: {
+		domainType: string;
+		domainId: string;
+		dateFrom: string;
+		dateTo: string;
+	}) => ['events', 'domainCalendar', args] as const
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -352,4 +358,92 @@ export function defineSeriesListQuery(
 		}),
 		queryClient ? () => queryClient : undefined
 	);
+}
+
+// ---------------------------------------------------------------------------
+// Domain calendar query
+// ---------------------------------------------------------------------------
+
+/**
+ * Domain calendar args — maps domainType to filter field for events.list.
+ */
+export interface DomainCalendarArgs {
+	domainType: 'subject' | 'asatidz' | 'place';
+	domainId: string;
+	dateFrom: string;
+	dateTo: string;
+}
+
+/**
+ * Build the filter args for `events.list` from a domain calendar args object.
+ * Maps domainType to the correct filter field (subject_id, asatidz_id, place_id).
+ */
+function domainCalendarFilterArgs(args: DomainCalendarArgs): ListArgs {
+	const filterField =
+		args.domainType === 'subject'
+			? { subject_id: args.domainId }
+			: args.domainType === 'asatidz'
+				? { asatidz_id: args.domainId }
+				: { place_id: args.domainId };
+
+	return {
+		...filterField,
+		date_from: args.dateFrom,
+		date_to: args.dateTo,
+		limit: 200
+	};
+}
+
+/**
+ * Reactive domain calendar query — fetches occurrences for a domain calendar.
+ *
+ * Maps domainType to the correct filter field and calls events.list with a
+ * date range ± 7 days padded around the current month.
+ */
+export function defineDomainCalendarQuery(
+	args: DomainCalendarArgs,
+	opts?: {
+		enabled?: boolean;
+		staleTime?: number;
+		requestId?: string;
+		initialData?: Paginated<EventRecurringResponse[]>;
+	},
+	queryClient?: QueryClient
+) {
+	return createQuery<Paginated<EventRecurringResponse[]>>(
+		() => ({
+			queryKey: eventKeys.domainCalendar(args),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('events.list', domainCalendarFilterArgs(args), undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<EventRecurringResponse[]>>,
+			enabled: opts?.enabled,
+			staleTime: opts?.staleTime,
+			initialData: opts?.initialData,
+			initialDataUpdatedAt: opts?.initialData ? Date.now() : undefined
+		}),
+		queryClient ? () => queryClient : undefined
+	);
+}
+
+/**
+ * Pure utility: extract unique ISO dates (date_start substring(0,10)) from
+ * a list of recurring event occurrences into a Set<string>.
+ *
+ * @example
+ * ```ts
+ * const dates = deriveEventDates(response.data)
+ * // Set { "2026-06-01", "2026-06-03", ... }
+ * ```
+ */
+export function deriveEventDates(occurrences: EventRecurringResponse[]): Set<string> {
+	const dates = new Set<string>();
+	for (const occ of occurrences) {
+		if (occ.date_start) {
+			dates.add(occ.date_start.substring(0, 10));
+		}
+	}
+	return dates;
 }

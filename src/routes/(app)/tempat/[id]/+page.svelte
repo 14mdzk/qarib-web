@@ -3,9 +3,15 @@
 	import { m } from '$core/i18n';
 	import { Skeleton } from '$lib/shared/primitives';
 	import MapView from '$lib/shared/composites/map-view.svelte';
+	import MonthCalendar from '$lib/shared/composites/month-calendar.svelte';
 	import EventCard from './EventCard.svelte';
 	import { definePlaceByIdQuery } from '$domains/places/queries.js';
-	import { defineSeriesListQuery } from '$domains/events/queries.js';
+	import {
+		defineSeriesListQuery,
+		defineDomainCalendarQuery,
+		deriveEventDates
+	} from '$domains/events/queries.js';
+	import { toLocalIsoDate, addIsoDateDays, shiftCalendarMonth } from '$lib/shared/utils/date';
 	import type { PinTier } from '$domains/events/pin-tier.js';
 	import type { PageData } from './$types';
 	import { l10n } from '$shared/utils/l10n';
@@ -70,6 +76,62 @@
 	const mapCenter = $derived<[number, number] | null>(
 		place?.lat != null && place?.lng != null ? [place.lat, place.lng] : null
 	);
+
+	// ---------------------------------------------------------------------------
+	// Calendar state
+	// ---------------------------------------------------------------------------
+
+	let showCalendar = $state(false);
+	let calendarAnchor = $state(toLocalIsoDate(new Date()).substring(0, 7) + '-01');
+	let activeCalendarDate = $state<string | null>(null);
+
+	const monthStart = $derived(calendarAnchor);
+	const monthEnd = $derived(shiftCalendarMonth(calendarAnchor, 1));
+
+	const calendarDateFrom = $derived(addIsoDateDays(monthStart, -7));
+	const calendarDateTo = $derived(addIsoDateDays(shiftCalendarMonth(monthEnd, 0), 7));
+
+	const calendarQuery = defineDomainCalendarQuery(
+		{
+			domainType: 'place',
+			domainId: id,
+			get dateFrom() {
+				return calendarDateFrom;
+			},
+			get dateTo() {
+				return calendarDateTo;
+			}
+		},
+		{
+			get enabled() {
+				return showCalendar;
+			}
+		}
+	);
+
+	const eventDates = $derived(deriveEventDates(calendarQuery.data?.data ?? []));
+
+	function handleCalendarDateClick(isoDate: string) {
+		activeCalendarDate = isoDate;
+		setTimeout(() => {
+			document.getElementById('kajian-section')?.scrollIntoView({ behavior: 'smooth' });
+		}, 100);
+	}
+
+	function resetCalendarFilter() {
+		activeCalendarDate = null;
+	}
+
+	const filteredKajianList = $derived.by(() => {
+		if (!activeCalendarDate) return null;
+		// Get event_ids from calendar occurrences on the clicked date
+		const occurrencesOnDate = (calendarQuery.data?.data ?? []).filter(
+			(occ) => occ.date_start?.substring(0, 10) === activeCalendarDate
+		);
+		const seriesIdsOnDate = new Set(occurrencesOnDate.map((occ) => occ.event_id));
+		// Filter the series list to matching series
+		return kajianList.filter((series) => seriesIdsOnDate.has(series.id));
+	});
 </script>
 
 <!--
@@ -136,7 +198,6 @@
 
 			<!-- Action row: directions · phone · share -->
 			<div class="mt-3 flex gap-2">
-				<!-- Petunjuk arah — external Google Maps URL, only when coords present -->
 				{#if place.lat != null && place.lng != null}
 					<a
 						href="https://maps.google.com/?q={place.lat},{place.lng}"
@@ -161,7 +222,6 @@
 					</a>
 				{/if}
 
-				<!-- Phone (only when field is present) -->
 				{#if place.phone}
 					<a
 						href="tel:{place.phone}"
@@ -186,7 +246,6 @@
 					</a>
 				{/if}
 
-				<!-- Share -->
 				<button
 					class="border-line bg-paper-2 text-ink flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-sm border"
 					aria-label={m.masjid_share()}
@@ -238,13 +297,69 @@
 				</div>
 			{/if}
 
+			<!-- ── Calendar toggle button ────────────────────────────────────────── -->
+			<button
+				class="border-line bg-paper-2 text-ink flex w-full items-center justify-center gap-2 rounded-sm border py-2.5 text-sm font-semibold transition-colors hover:bg-[var(--color-orange-50)]"
+				data-testid="calendar-toggle-btn"
+				onclick={() => {
+					showCalendar = !showCalendar;
+					if (!showCalendar) {
+						activeCalendarDate = null;
+					}
+				}}
+			>
+				<svg
+					width="15"
+					height="15"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+					><rect width="18" height="18" x="3" y="4" rx="2" /><line
+						x1="16"
+						y1="2"
+						x2="16"
+						y2="6"
+					/><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg
+				>
+				{showCalendar ? m.calendar_toggle_list() : m.calendar_toggle_calendar()}
+			</button>
+
+			<!-- ── MonthCalendar (when toggled on) ──────────────────────────────── -->
+			{#if showCalendar}
+				<MonthCalendar
+					domainName={l10n(place?.name || placeQuery.data?.name)}
+					{eventDates}
+					loading={calendarQuery.isPending}
+					error={calendarQuery.isError ? m.calendar_error_body() : null}
+					activeDate={activeCalendarDate}
+					onRetry={() => calendarQuery.refetch()}
+					onDateClick={handleCalendarDateClick}
+				/>
+			{/if}
+
 			<!-- Kajian rutin section -->
-			<div data-testid="kajian-section">
+			<div id="kajian-section" data-testid="kajian-section">
 				<div
 					class="text-ink-3 mb-2.5 flex items-baseline justify-between text-[11px] font-bold tracking-widest uppercase"
 				>
-					<span>{m.masjid_kajian_section_title()}</span>
-					{#if kajianList.length > 0}
+					<span
+						>{activeCalendarDate
+							? m.calendar_date_label({ date: activeCalendarDate })
+							: m.masjid_kajian_section_title()}</span
+					>
+					{#if activeCalendarDate}
+						<button
+							class="text-orange cursor-pointer text-[11px] font-semibold normal-case"
+							onclick={resetCalendarFilter}
+							data-testid="calendar-reset-btn"
+						>
+							{m.calendar_toggle_list()}
+						</button>
+					{:else if kajianList.length > 0}
 						<span class="text-ink-4 text-[11px] font-normal tracking-normal normal-case">
 							{m.masjid_kajian_count({ n: kajianList.length })}
 						</span>
@@ -252,39 +367,20 @@
 				</div>
 
 				<div class="flex flex-col gap-2">
-					{#each kajianList as series (series.id)}
-						<EventCard {series} />
-					{:else}
+					{#if activeCalendarDate && (filteredKajianList ?? []).length === 0}
 						<div class="border-line rounded border p-4 text-center">
 							<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
 						</div>
-					{/each}
+					{:else}
+						{#each filteredKajianList ?? kajianList as series (series.id)}
+							<EventCard {series} />
+						{:else}
+							<div class="border-line rounded border p-4 text-center">
+								<p class="text-ink-3 text-sm">{m.kajian_no_upcoming()}</p>
+							</div>
+						{/each}
+					{/if}
 				</div>
-
-				<!-- TODO(phase-E): wire full schedule page -->
-				<button
-					class="border-line bg-paper-2 text-ink mt-3 flex w-full items-center justify-center gap-1.5 rounded-sm border py-2 text-sm font-semibold"
-					data-testid="see-all-btn"
-				>
-					<svg
-						width="15"
-						height="15"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-						><rect width="18" height="18" x="3" y="4" rx="2" /><line
-							x1="16"
-							y1="2"
-							y2="6"
-							x2="16"
-						/><line x1="8" y1="2" y2="6" x2="8" /><line x1="3" y1="10" y2="10" x2="21" /></svg
-					>
-					{m.masjid_kajian_see_all()}
-				</button>
 			</div>
 		</div>
 	{/if}
