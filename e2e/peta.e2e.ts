@@ -494,6 +494,11 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await sheet.getByRole('button', { name: /Minggu ini/i }).click();
 
 		const eventRow = sheet.getByRole('button', { name: /Kajian Pekanan Tafsir/i });
+		await expect(eventRow.locator('.time-block')).toBeVisible();
+		await expect(eventRow.locator('.date-tag')).toBeVisible();
+		await expect(eventRow.locator('.subject-pill')).toBeVisible();
+		await expect(eventRow.locator('.event-card__title')).toBeVisible();
+		await expect(eventRow.locator('.event-card__meta')).toBeVisible();
 		await expect(eventRow).toContainText(formatSheetDateLabel(3));
 		await expect(eventRow).toContainText('Ustadz Ahmad');
 		await expect(eventRow).toContainText('Tafsir');
