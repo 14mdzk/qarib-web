@@ -31,7 +31,6 @@
 	import { defineSubjectListQuery } from '$domains/subject/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
 	import {
-		groupFuturePlaces,
 		groupOccurrencesToPlacePins,
 		mergeNearbyPlacesWithEventPins
 	} from '$domains/events/place-pins.js';
@@ -61,6 +60,7 @@
 	let todayIso = $state<string | null>(null);
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
+	let emptySheetDismissedForKey = $state<string | null>(null);
 	let customDatePickerOpen = $state(false);
 	let calendarMonth = $state<string | null>(null);
 
@@ -129,14 +129,6 @@
 		return days;
 	}
 
-	function futureRange(): { date_from: string; date_to: string } | null {
-		if (!tomorrowIso) return null;
-		const start = toDateRange(tomorrowIso);
-		const futureEnd = addDaysIso(14);
-		const end = toDateRange(futureEnd ?? tomorrowIso);
-		return { date_from: start.date_from, date_to: end.date_to };
-	}
-
 	function nextRadiusKm(current: number): number {
 		return RADIUS_STEPS_KM.find((step) => step > current) ?? MAX_RADIUS_KM;
 	}
@@ -193,7 +185,7 @@
 		limit: 30
 	});
 	const nearbyPlacesQuery = definePlaceListQuery(() => nearbyPlaceArgs, {
-		enabled: () => browserReady && eventsView.selectedSubjectId == null,
+		enabled: () => browserReady,
 		staleTime: 60_000
 	});
 	const nearbyPlaces = $derived(nearbyPlacesQuery.data?.data ?? []);
@@ -212,27 +204,16 @@
 			(location.permission === 'denied' || location.permission === 'unavailable')
 	);
 
-	const fallbackDateRange = $derived(futureRange());
-	const fallbackArgs = $derived({
-		lat: isManual ? undefined : location.center?.lat,
-		lng: isManual ? undefined : location.center?.lng,
-		radius_km: isManual ? undefined : MAX_RADIUS_KM,
-		region_id: regionId,
-		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: fallbackDateRange?.date_from,
-		date_to: fallbackDateRange?.date_to,
-		expand: 'place',
-		limit: 30
-	});
-	const fallbackEnabled = $derived(
-		dateReady && query.isSuccess && events.length === 0 && !showLocationNotice
-	);
-	const fallbackQuery = defineNearbyInfiniteQuery(() => ({
-		args: fallbackArgs,
-		enabled: fallbackEnabled
-	}));
-	const fallbackEvents = $derived(
-		(fallbackQuery.data?.pages ?? []).flatMap((p) => p.data) as EventRecurringResponseWithPlace[]
+	const queryContextKey = $derived(
+		[
+			activeDay ?? '',
+			eventsView.selectedDateMode,
+			eventsView.selectedCustomDate ?? '',
+			eventsView.selectedRadiusKm,
+			eventsView.selectedSubjectId ?? '',
+			(location.center?.lat ?? 0).toFixed(5),
+			(location.center?.lng ?? 0).toFixed(5)
+		].join('|')
 	);
 
 	// ---------------------------------------------------------------------------
@@ -246,7 +227,10 @@
 		})
 	);
 	const placeOnlyPinsSource = $derived(
-		query.isSuccess && eventsView.selectedSubjectId == null ? nearbyPlaces : []
+		query.isSuccess &&
+			(eventsView.selectedSubjectId == null || emptySheetDismissedForKey === queryContextKey)
+			? nearbyPlaces
+			: []
 	);
 	const placePins = $derived(
 		mergeNearbyPlacesWithEventPins(eventPlacePins, placeOnlyPinsSource, m.pin_label_place()).map(
@@ -386,16 +370,12 @@
 	let activePinDay = $state<'today' | 'tomorrow' | 'week'>('today');
 	let lastQueryContextKey = $state<string | null>(null);
 
-	const queryContextKey = $derived(
-		[
-			activeDay ?? '',
-			eventsView.selectedDateMode,
-			eventsView.selectedCustomDate ?? '',
-			eventsView.selectedRadiusKm,
-			eventsView.selectedSubjectId ?? '',
-			(location.center?.lat ?? 0).toFixed(5),
-			(location.center?.lng ?? 0).toFixed(5)
-		].join('|')
+	const showEmptySheet = $derived(
+		!query.isPending &&
+			!query.isError &&
+			events.length === 0 &&
+			!showLocationNotice &&
+			emptySheetDismissedForKey !== queryContextKey
 	);
 
 	$effect(() => {
@@ -459,7 +439,6 @@
 		activePinDay = dateModeToInitialPinDay(eventsView.selectedDateMode);
 	}
 
-	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
 	const calendarDays = $derived(calendarMonth ? buildCalendarGrid(calendarMonth) : []);
 	const calendarMonthLabel = $derived(
 		calendarMonth ? formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' }) : ''
@@ -610,7 +589,7 @@
 	{/if}
 
 	<!-- Empty state: in-map bottom sheet (resolved, 0 events) -->
-	{#if !query.isPending && !query.isError && events.length === 0 && !showLocationNotice}
+	{#if showEmptySheet}
 		<div
 			class="empty-sheet"
 			role="status"
@@ -625,10 +604,15 @@
 				<div class="edge-sheet__copy">
 					<p id="peta-empty-title" class="edge-sheet__title">{m.peta_map_empty_title()}</p>
 					<p id="peta-empty-body" class="edge-sheet__body">
-						{m.peta_map_empty_body({
-							radius: eventsView.selectedRadiusKm,
-							nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
-						})}
+						{eventsView.selectedDateMode === 'week'
+							? m.peta_map_empty_week_body({
+									radius: eventsView.selectedRadiusKm,
+									nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
+								})
+							: m.peta_map_empty_body({
+									radius: eventsView.selectedRadiusKm,
+									nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
+								})}
 					</p>
 				</div>
 			</div>
@@ -646,32 +630,13 @@
 				</button>
 				<button
 					class="edge-sheet__button edge-sheet__button--secondary"
-					onclick={() => chooseDateMode('tomorrow')}
+					onclick={() => {
+						emptySheetDismissedForKey = queryContextKey;
+					}}
 				>
-					{m.peta_map_empty_tomorrow_action()}
+					{m.peta_map_empty_places_action()}
 				</button>
 			</div>
-			{#if fallbackPlaces.length > 0}
-				<div class="fallback-places">
-					<p class="fallback-places__title">{m.peta_future_places_title()}</p>
-					{#each fallbackPlaces as place (place.id)}
-						<button class="fallback-place" onclick={() => navigateToPlace(place.id)}>
-							<span class="fallback-place__pin" aria-hidden="true">
-								<MapPin class="size-4" />
-							</span>
-							<span class="fallback-place__meta">
-								<span class="fallback-place__name">{place.name}</span>
-								<span class="fallback-place__sub">
-									{m.peta_future_place_meta({
-										count: place.count,
-										date: place.nextLabel
-									})}
-								</span>
-							</span>
-						</button>
-					{/each}
-				</div>
-			{/if}
 		</div>
 	{/if}
 
@@ -946,8 +911,7 @@
 	}
 
 	.edge-sheet__button:focus-visible,
-	.filter-sheet button:focus-visible,
-	.fallback-place:focus-visible {
+	.filter-sheet button:focus-visible {
 		outline: 2px solid var(--color-orange);
 		outline-offset: 2px;
 	}
@@ -956,71 +920,6 @@
 		display: flex;
 		gap: 10px;
 		align-items: flex-start;
-	}
-
-	.fallback-places {
-		margin-top: 12px;
-		padding-top: 10px;
-		border-top: 1px solid var(--color-line);
-	}
-
-	.fallback-places__title {
-		margin: 0 0 8px;
-		color: var(--color-ink-3);
-		font-size: 11px;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.fallback-place {
-		width: 100%;
-		display: flex;
-		gap: 9px;
-		align-items: center;
-		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		padding: 7px 6px;
-		text-align: left;
-		font-family: inherit;
-		cursor: pointer;
-	}
-
-	.fallback-place:hover {
-		background: var(--color-paper-2);
-	}
-
-	.fallback-place__pin {
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		background: var(--color-orange-50);
-		color: var(--color-orange-700);
-		flex-shrink: 0;
-	}
-
-	.fallback-place__meta {
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-
-	.fallback-place__name {
-		color: var(--color-ink);
-		font-size: 12.5px;
-		font-weight: 800;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.fallback-place__sub {
-		color: var(--color-ink-3);
-		font-size: 11px;
 	}
 
 	.filter-sheet {

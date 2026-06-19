@@ -258,6 +258,29 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(filterToolbar(page).getByRole('button', { name: 'Hari ini' })).toBeVisible();
 	});
 
+	test('week date mode requests today through the next seven local days', async ({ page }) => {
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		const today = addDaysIso(0);
+		const weekEnd = addDaysIso(7);
+		const request = waitForNearbyRequest(
+			page,
+			(params) =>
+				params.get('date_from')?.startsWith(`${today}T00:00:00`) === true &&
+				params.get('date_to')?.startsWith(`${weekEnd}T23:59:59`) === true &&
+				params.get('limit') === '10'
+		);
+
+		await openDateSheet(page);
+		await page.getByRole('button', { name: 'Pekan ini' }).click();
+
+		const params = await request;
+		expect(params.get('date_from')).toContain(`${today}T00:00:00`);
+		expect(params.get('date_to')).toContain(`${weekEnd}T23:59:59`);
+		await expect(filterToolbar(page).getByRole('button', { name: 'Pekan ini' })).toBeVisible();
+	});
+
 	test('tomorrow and custom date filters refetch nearby events with date query args', async ({
 		page
 	}) => {
@@ -352,18 +375,13 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(placePinMarkers(page)).toHaveCount(0);
 	});
 
-	test('empty filtered results keep the map visible, expand radius, and group future place suggestions', async ({
+	test('empty filtered results keep the map visible and can pivot to nearby places', async ({
 		page
 	}) => {
 		await page.goto('/peta');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		const fallbackRequest = waitForNearbyRequest(
-			page,
-			(params) => params.get('subject_id') === 'subject-empty' && params.get('limit') === '30'
-		);
 		const currentRequest = await selectSubject(page, 'Fiqih', 'subject-empty');
-		await fallbackRequest;
 
 		expect(currentRequest.get('radius_km')).toBe('10');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible();
@@ -372,11 +390,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(emptySheet).toBeVisible();
 		await expect(emptySheet).toContainText('radius 10 km');
 		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 15 km' })).toBeVisible();
-		await expect(emptySheet.getByRole('button', { name: 'Cek besok' })).toBeVisible();
-
-		await expect(emptySheet).toContainText('Masjid dengan kajian mendatang');
-		await expect(emptySheet).toContainText('Masjid Masa Depan');
-		await expect(emptySheet).toContainText('1 kajian');
+		await expect(emptySheet.getByRole('button', { name: 'Lihat masjid sekitar' })).toBeVisible();
 
 		for (const radius of [15, 25, 40, 60]) {
 			const request = waitForNearbyRequest(
@@ -392,8 +406,9 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		await expect(emptySheet.getByRole('button', { name: 'Radius 60 km' })).toBeDisabled();
 
-		await emptySheet.getByRole('button', { name: /Masjid Masa Depan/ }).click();
-		await expect(page).toHaveURL(/\/tempat\/place-future-1$/);
+		await emptySheet.getByRole('button', { name: 'Lihat masjid sekitar' }).click();
+		await expect(emptySheet).toHaveCount(0);
+		await expect(placePinMarkers(page).first()).toBeVisible();
 	});
 
 	test('renders Leaflet markers for the stub places', async ({ page }) => {
