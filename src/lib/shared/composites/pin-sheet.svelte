@@ -212,15 +212,17 @@
 				</div>
 			</div>
 
-			<button
-				class="icon-btn"
-				onclick={mode === 'full' ? oncollapse : onexpand}
-				aria-label={mode === 'full' ? m.pin_sheet_collapse() : m.pin_sheet_expand()}
-				aria-expanded={mode === 'full'}
-			>
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
-				{@html CHEVRON_UP_SVG}
-			</button>
+			{#if events.length > 0}
+				<button
+					class="icon-btn"
+					onclick={mode === 'full' ? oncollapse : onexpand}
+					aria-label={mode === 'full' ? m.pin_sheet_collapse() : m.pin_sheet_expand()}
+					aria-expanded={mode === 'full'}
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+					{@html CHEVRON_UP_SVG}
+				</button>
+			{/if}
 		</div>
 
 		{#if events.length === 0}
@@ -228,6 +230,12 @@
 				<div class="empty-events__title">{m.pin_sheet_no_events_title()}</div>
 				<div class="empty-events__body">{m.pin_sheet_no_events_body()}</div>
 			</div>
+
+			<button class="open-place-btn" onclick={onopenplace}>
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+				{@html MOSQUE_SVG}
+				{m.pin_sheet_open_place()}
+			</button>
 		{:else if mode === 'peek' && peekEvent}
 			<!-- Peek: one urgency event row -->
 			<div class="peek-event">

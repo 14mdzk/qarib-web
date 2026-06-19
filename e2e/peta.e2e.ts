@@ -473,7 +473,8 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(page).toHaveURL(/\/peta$/);
 		const sheet = page.getByRole('complementary', { name: /Masjid Jami' As-Sunnah Cirebon/ });
 		await expect(sheet).toBeVisible();
-		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toHaveCount(0);
+		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toBeVisible();
+		await expect(sheet.getByRole('button', { name: /Lihat semua kajian/i })).toHaveCount(0);
 	});
 
 	test('pin sheet week events show date, scholar, subject, and navigate to event detail', async ({
