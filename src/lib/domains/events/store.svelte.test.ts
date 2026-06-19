@@ -22,23 +22,28 @@ describe('EventsViewService', () => {
 		svc = new EventsViewService();
 	});
 
-	it('starts with selectedDate=null, selectedPlaceId=null, sheetMode=peek', () => {
-		expect(svc.selectedDate).toBeNull();
+	it('starts in today date mode with no custom date, selectedPlaceId=null, sheetMode=peek', () => {
+		expect(svc.selectedDateMode).toBe('today');
+		expect(svc.selectedCustomDate).toBeNull();
 		expect(svc.selectedRadiusKm).toBe(DEFAULT_RADIUS_KM);
 		expect(svc.selectedSubjectId).toBeNull();
 		expect(svc.selectedPlaceId).toBeNull();
 		expect(svc.sheetMode).toBe('peek');
 	});
 
-	it('selectDate sets the date', () => {
-		svc.selectDate('2026-06-10');
-		expect(svc.selectedDate).toBe('2026-06-10');
+	it('selectDateMode stores preset modes and clears custom dates', () => {
+		svc.selectDateMode('custom', '2026-06-23');
+		svc.selectDateMode('week');
+
+		expect(svc.selectedDateMode).toBe('week');
+		expect(svc.selectedCustomDate).toBeNull();
 	});
 
-	it('selectDate(null) resets the date', () => {
-		svc.selectDate('2026-06-10');
-		svc.selectDate(null);
-		expect(svc.selectedDate).toBeNull();
+	it('selectDateMode stores a custom date only for custom mode', () => {
+		svc.selectDateMode('custom', '2026-06-23');
+
+		expect(svc.selectedDateMode).toBe('custom');
+		expect(svc.selectedCustomDate).toBe('2026-06-23');
 	});
 
 	it('selectRadius clamps below the default radius and above the max radius', () => {

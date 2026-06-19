@@ -205,10 +205,23 @@ export function defineNearbyInfiniteQuery(
  * Reactive event-list query (requires Svelte component context).
  */
 export function defineEventListQuery(
-	args: ListArgs,
-	opts?: { enabled?: boolean; staleTime?: number; requestId?: string }
+	args: ListArgs | (() => ListArgs),
+	opts?: { enabled?: boolean | (() => boolean); staleTime?: number; requestId?: string }
 ) {
-	return defineQuery('events.list', args, opts);
+	return createQuery<Paginated<EventRecurringResponse[]>>(() => {
+		const resolvedArgs = typeof args === 'function' ? args() : args;
+		return {
+			queryKey: eventKeys.list(resolvedArgs),
+			queryFn: ({ signal }: { signal: AbortSignal }) =>
+				api('events.list', resolvedArgs, undefined, {
+					signal,
+					requestId: opts?.requestId,
+					baseUrl: ''
+				}) as Promise<Paginated<EventRecurringResponse[]>>,
+			enabled: typeof opts?.enabled === 'function' ? opts.enabled() : opts?.enabled,
+			staleTime: opts?.staleTime
+		};
+	});
 }
 
 /**

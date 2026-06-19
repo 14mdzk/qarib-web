@@ -4,11 +4,7 @@
  * Conformance: rule .claude/rules/testing.md (unit tests, co-located with unit).
  */
 import { describe, it, expect } from 'vitest';
-import {
-	groupFuturePlaces,
-	groupOccurrencesToPlacePins,
-	mergeNearbyPlacesWithEventPins
-} from './place-pins.js';
+import { groupOccurrencesToPlacePins, mergeNearbyPlacesWithEventPins } from './place-pins.js';
 import type { EventRecurringResponseWithPlace } from './schema.js';
 
 // ---------------------------------------------------------------------------
@@ -139,29 +135,6 @@ describe('groupOccurrencesToPlacePins', () => {
 
 		expect(nowPins[0].label).toBe('CUSTOM_NOW');
 		expect(laterPins[0].label).toBe('CUSTOM_LATER');
-	});
-});
-
-describe('groupFuturePlaces', () => {
-	it('dedupes future suggestions by event series instead of occurrence count', () => {
-		const events = [
-			makeOccurrence(1, 'place-a', -6.732, 108.552, '2026-06-04T10:00:00Z'),
-			makeOccurrence(2, 'place-a', -6.732, 108.552, '2026-06-11T10:00:00Z'),
-			makeOccurrence(3, 'place-a', -6.732, 108.552, '2026-06-18T10:00:00Z')
-		];
-		events[0].event_id = 'series-a';
-		events[1].event_id = 'series-a';
-		events[2].event_id = 'series-b';
-
-		const places = groupFuturePlaces(events, (iso) => iso.slice(0, 10));
-
-		expect(places).toHaveLength(1);
-		expect(places[0]).toMatchObject({
-			id: 'place-a',
-			name: 'Masjid place-a',
-			count: 2,
-			nextLabel: '2026-06-04'
-		});
 	});
 });
 

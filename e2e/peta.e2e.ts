@@ -12,7 +12,7 @@
  *   - The GPS FAB is rendered.
  *   - A pin click opens a PinSheet (peek mode) with place name visible.
  *   - PinSheet can be expanded via the chevron button.
- *   - PinSheet can be closed via the scrim/collapse button.
+ *   - The map remains interactive while PinSheet is open.
  *
  * Note: Leaflet requires a real browser context; tile endpoints may return
  * errors (test key / network) but the map container and markers still render
@@ -31,6 +31,16 @@ function addDaysIso(days: number): string {
 	const month = String(date.getMonth() + 1).padStart(2, '0');
 	const day = String(date.getDate()).padStart(2, '0');
 	return `${year}-${month}-${day}`;
+}
+
+function formatSheetDateLabel(days: number): string {
+	const iso = addDaysIso(days);
+	const [year, month, day] = iso.split('-').map(Number);
+	return new Intl.DateTimeFormat('id-ID', {
+		weekday: 'short',
+		day: 'numeric',
+		month: 'short'
+	}).format(new Date(year, month - 1, day, 12));
 }
 
 async function useCirebonGeolocation(page: Page): Promise<void> {
@@ -130,6 +140,28 @@ function eventPinMarkers(page: Page) {
 
 function placePinMarkers(page: Page) {
 	return page.locator('.leaflet-marker-icon').filter({ hasText: /Masjid/ });
+}
+
+function userLocationMarker(page: Page) {
+	return page.locator('.leaflet-marker-icon').filter({
+		has: page.locator('div[style*="var(--color-blue)"]')
+	});
+}
+
+async function markerDistanceFromMapCenter(page: Page): Promise<number> {
+	const markerBox = await userLocationMarker(page).first().boundingBox();
+	const mapBox = await page
+		.getByRole('application', { name: 'Peta kajian interaktif' })
+		.boundingBox();
+	expect(markerBox).not.toBeNull();
+	expect(mapBox).not.toBeNull();
+	if (!markerBox || !mapBox) return Number.POSITIVE_INFINITY;
+
+	const markerCenterX = markerBox.x + markerBox.width / 2;
+	const markerCenterY = markerBox.y + markerBox.height / 2;
+	const mapCenterX = mapBox.x + mapBox.width / 2;
+	const mapCenterY = mapBox.y + mapBox.height / 2;
+	return Math.hypot(markerCenterX - mapCenterX, markerCenterY - mapCenterY);
 }
 
 async function openDateSheet(page: Page): Promise<void> {
@@ -258,6 +290,29 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(filterToolbar(page).getByRole('button', { name: 'Hari ini' })).toBeVisible();
 	});
 
+	test('week date mode requests today through the next seven local days', async ({ page }) => {
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		const today = addDaysIso(0);
+		const weekEnd = addDaysIso(7);
+		const request = waitForNearbyRequest(
+			page,
+			(params) =>
+				params.get('date_from')?.startsWith(`${today}T00:00:00`) === true &&
+				params.get('date_to')?.startsWith(`${weekEnd}T23:59:59`) === true &&
+				params.get('limit') === '10'
+		);
+
+		await openDateSheet(page);
+		await page.getByRole('button', { name: 'Pekan ini' }).click();
+
+		const params = await request;
+		expect(params.get('date_from')).toContain(`${today}T00:00:00`);
+		expect(params.get('date_to')).toContain(`${weekEnd}T23:59:59`);
+		await expect(filterToolbar(page).getByRole('button', { name: 'Pekan ini' })).toBeVisible();
+	});
+
 	test('tomorrow and custom date filters refetch nearby events with date query args', async ({
 		page
 	}) => {
@@ -352,18 +407,13 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(placePinMarkers(page)).toHaveCount(0);
 	});
 
-	test('empty filtered results keep the map visible, expand radius, and group future place suggestions', async ({
+	test('empty filtered results keep the map visible and can pivot to nearby places', async ({
 		page
 	}) => {
 		await page.goto('/peta');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		const fallbackRequest = waitForNearbyRequest(
-			page,
-			(params) => params.get('subject_id') === 'subject-empty' && params.get('limit') === '30'
-		);
 		const currentRequest = await selectSubject(page, 'Fiqih', 'subject-empty');
-		await fallbackRequest;
 
 		expect(currentRequest.get('radius_km')).toBe('10');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible();
@@ -372,11 +422,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(emptySheet).toBeVisible();
 		await expect(emptySheet).toContainText('radius 10 km');
 		await expect(emptySheet.getByRole('button', { name: 'Perluas ke 15 km' })).toBeVisible();
-		await expect(emptySheet.getByRole('button', { name: 'Cek besok' })).toBeVisible();
-
-		await expect(emptySheet).toContainText('Masjid dengan kajian mendatang');
-		await expect(emptySheet).toContainText('Masjid Masa Depan');
-		await expect(emptySheet).toContainText('1 kajian');
+		await expect(emptySheet.getByRole('button', { name: 'Lihat masjid sekitar' })).toBeVisible();
 
 		for (const radius of [15, 25, 40, 60]) {
 			const request = waitForNearbyRequest(
@@ -392,8 +438,9 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		await expect(emptySheet.getByRole('button', { name: 'Radius 60 km' })).toBeDisabled();
 
-		await emptySheet.getByRole('button', { name: /Masjid Masa Depan/ }).click();
-		await expect(page).toHaveURL(/\/tempat\/place-future-1$/);
+		await emptySheet.getByRole('button', { name: 'Lihat masjid sekitar' }).click();
+		await expect(emptySheet).toHaveCount(0);
+		await expect(placePinMarkers(page).first()).toBeVisible();
 	});
 
 	test('renders Leaflet markers for the stub places', async ({ page }) => {
@@ -437,7 +484,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(page.getByRole('complementary').first()).toBeVisible();
 	});
 
-	test('place-only pin routes to tempat without opening PinSheet', async ({ page }) => {
+	test('place-only pin opens PinSheet without leaving the map', async ({ page }) => {
 		await page.goto('/peta');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
@@ -445,8 +492,41 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(placePin).toHaveCount(1);
 		await placePin.click();
 
-		await expect(page).toHaveURL(/\/tempat\/place-soon-1$/);
-		await expect(page.getByRole('complementary')).toHaveCount(0);
+		await expect(page).toHaveURL(/\/peta$/);
+		const sheet = page.getByRole('complementary', { name: /Masjid Jami' As-Sunnah Cirebon/ });
+		await expect(sheet).toBeVisible();
+		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toBeVisible();
+		await expect(sheet.getByRole('button', { name: /Lihat semua kajian/i })).toHaveCount(0);
+	});
+
+	test('pin sheet week events show date, scholar, subject, and navigate to event detail', async ({
+		page
+	}) => {
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await selectSubject(page, 'Tafsir', 'subject-tafsir');
+		const marker = eventPinMarkers(page).first();
+		await expect(marker).toBeVisible({ timeout: 10_000 });
+		await marker.click();
+
+		const sheet = page.getByRole('complementary', { name: /Masjid Al-Falah/ });
+		await expect(sheet).toBeVisible({ timeout: 5_000 });
+		await sheet.getByRole('button', { name: /Lihat semua kajian/i }).click();
+		await sheet.getByRole('button', { name: /Minggu ini/i }).click();
+
+		const eventRow = sheet.getByRole('button', { name: /Kajian Pekanan Tafsir/i });
+		await expect(eventRow.locator('.time-block')).toBeVisible();
+		await expect(eventRow.locator('.date-tag')).toBeVisible();
+		await expect(eventRow.locator('.subject-pill')).toBeVisible();
+		await expect(eventRow.locator('.event-card__title')).toBeVisible();
+		await expect(eventRow.locator('.event-card__meta')).toBeVisible();
+		await expect(eventRow).toContainText(formatSheetDateLabel(3));
+		await expect(eventRow).toContainText('Ustadz Ahmad');
+		await expect(eventRow).toContainText('Tafsir');
+
+		await eventRow.click();
+		await expect(page).toHaveURL(/\/kajian\/uuid-place-week-a$/);
 	});
 
 	test('GPS FAB is rendered', async ({ page }) => {
@@ -456,6 +536,36 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		// MapFab renders a button with the GPS aria-label.
 		await expect(page.getByRole('button', { name: /Lokasiku/i }).first()).toBeVisible();
+	});
+
+	test('GPS FAB recenters the map on the user location after manual pan', async ({ page }) => {
+		await page.goto('/peta');
+		const map = page.getByRole('application', { name: 'Peta kajian interaktif' });
+		await expect(map).toBeVisible({ timeout: 10_000 });
+		await expect(userLocationMarker(page).first()).toBeVisible({ timeout: 10_000 });
+
+		const initialDistance = await markerDistanceFromMapCenter(page);
+		expect(initialDistance).toBeLessThan(32);
+
+		const mapBox = await map.boundingBox();
+		expect(mapBox).not.toBeNull();
+		if (!mapBox) return;
+		await page.mouse.move(mapBox.x + mapBox.width / 2, mapBox.y + mapBox.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(mapBox.x + mapBox.width / 2 + 180, mapBox.y + mapBox.height / 2 + 120, {
+			steps: 8
+		});
+		await page.mouse.up();
+
+		await expect(async () => {
+			expect(await markerDistanceFromMapCenter(page)).toBeGreaterThan(80);
+		}).toPass();
+
+		await page.getByRole('button', { name: /Lokasiku/i }).click();
+
+		await expect(async () => {
+			expect(await markerDistanceFromMapCenter(page)).toBeLessThan(32);
+		}).toPass();
 	});
 
 	test('custom zoom controls are bottom-right and Leaflet default zoom control is absent', async ({
@@ -521,24 +631,27 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		});
 	});
 
-	test('scrim closes pin sheet', async ({ page }) => {
+	test('clicking another pin switches PinSheet without a blocking scrim click', async ({
+		page
+	}) => {
 		await page.goto('/peta');
 
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		const firstMarker = page.locator('.leaflet-marker-icon').first();
+		const firstMarker = eventPinMarkers(page).first();
+		const secondMarker = eventPinMarkers(page).nth(1);
 		await expect(firstMarker).toBeVisible({ timeout: 10_000 });
+		await expect(secondMarker).toBeVisible({ timeout: 10_000 });
 		await firstMarker.click();
 
-		const sheet = page.getByRole('complementary').first();
-		await expect(sheet).toBeVisible({ timeout: 5_000 });
+		await expect(page.getByRole('complementary', { name: /Masjid Al-Falah/ })).toBeVisible({
+			timeout: 5_000
+		});
 
-		// Click the scrim button by its specific aria-label (not the chevron inside the sheet).
-		// The scrim is a button outside the sheet with aria-label matching pin_sheet_collapse.
-		await page.getByRole('button', { name: 'Tutup', exact: true }).last().click();
-
-		// Sheet should be gone.
-		await expect(sheet).not.toBeVisible({ timeout: 3_000 });
+		await secondMarker.click();
+		await expect(page.getByRole('complementary', { name: /Masjid Jami' Cirebon/ })).toBeVisible({
+			timeout: 3_000
+		});
 	});
 });
 

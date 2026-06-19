@@ -85,9 +85,9 @@
 
 	const DISTANCE_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M5 12l4-4M5 12l4 4M19 12l-4-4M19 12l-4 4"/></svg>`;
 
-	const CHEVRON_UP_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 15 12 9 18 15"/></svg>`;
+	const MAP_PIN_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
 
-	const CHEVRON_R_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 6 15 12 9 18"/></svg>`;
+	const CHEVRON_UP_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 15 12 9 18 15"/></svg>`;
 
 	// ---------------------------------------------------------------------------
 	// Urgency badge style per tier
@@ -208,18 +208,31 @@
 				</div>
 			</div>
 
-			<button
-				class="icon-btn"
-				onclick={mode === 'full' ? oncollapse : onexpand}
-				aria-label={mode === 'full' ? m.pin_sheet_collapse() : m.pin_sheet_expand()}
-				aria-expanded={mode === 'full'}
-			>
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
-				{@html CHEVRON_UP_SVG}
-			</button>
+			{#if events.length > 0}
+				<button
+					class="icon-btn"
+					onclick={mode === 'full' ? oncollapse : onexpand}
+					aria-label={mode === 'full' ? m.pin_sheet_collapse() : m.pin_sheet_expand()}
+					aria-expanded={mode === 'full'}
+				>
+					<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+					{@html CHEVRON_UP_SVG}
+				</button>
+			{/if}
 		</div>
 
-		{#if mode === 'peek' && peekEvent}
+		{#if events.length === 0}
+			<div class="empty-events">
+				<div class="empty-events__title">{m.pin_sheet_no_events_title()}</div>
+				<div class="empty-events__body">{m.pin_sheet_no_events_body()}</div>
+			</div>
+
+			<button class="open-place-btn" onclick={onopenplace}>
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+				{@html MOSQUE_SVG}
+				{m.pin_sheet_open_place()}
+			</button>
+		{:else if mode === 'peek' && peekEvent}
 			<!-- Peek: one urgency event row -->
 			<div class="peek-event">
 				{#if urgencyLabel(peekEvent.tier)}
@@ -255,30 +268,32 @@
 						class:event-row--urgent={event.tier === 'now' || event.tier === 'soon'}
 						onclick={() => onselectevent?.(event.id)}
 					>
-						<!-- Time pill -->
-						<div
-							class="time-pill"
-							class:time-pill--urgent={event.tier === 'now' || event.tier === 'soon'}
-						>
-							<span class="time-main">{event.timeLabel}</span>
-							{#if event.anchorLabel}
-								<span class="time-anchor">{event.anchorLabel}</span>
+						<div class="time-block">
+							<span class="time-block__time">{event.timeLabel}</span>
+						</div>
+
+						<div class="event-card__body">
+							<div class="event-card__tags">
+								{#if event.anchorLabel}
+									<span class="date-tag">{event.anchorLabel}</span>
+								{/if}
+								{#if event.subjectLabel}
+									<span class="subject-pill subject-pill--static">{event.subjectLabel}</span>
+								{/if}
+							</div>
+
+							<div class="event-card__title">{event.title}</div>
+
+							{#if event.ustadzName}
+								<div class="event-card__meta">
+									<span class="event-card__meta-icon" aria-hidden="true">
+										<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+										{@html MAP_PIN_SVG}
+									</span>
+									<span class="meta-text">{event.ustadzName}</span>
+								</div>
 							{/if}
 						</div>
-
-						<!-- Event body -->
-						<div class="event-body">
-							<div class="event-title">{event.title}</div>
-							<div class="event-meta">
-								{event.ustadzName}{event.subjectLabel ? ` · ${event.subjectLabel}` : ''}
-							</div>
-						</div>
-
-						<!-- Chevron -->
-						<span class="event-chevron" aria-hidden="true">
-							<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
-							{@html CHEVRON_R_SVG}
-						</span>
 					</button>
 				{/each}
 			</div>
@@ -437,6 +452,23 @@
 		padding: 4px 0 2px;
 	}
 
+	.empty-events {
+		padding: 12px 0 10px;
+	}
+
+	.empty-events__title {
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--color-ink);
+	}
+
+	.empty-events__body {
+		margin-top: 3px;
+		font-size: 11.5px;
+		line-height: 1.45;
+		color: var(--color-ink-3);
+	}
+
 	/* ── Day-filter chips (full mode) ──────────────────────────────────── */
 	.day-chips {
 		display: flex;
@@ -480,16 +512,27 @@
 
 	.event-row {
 		display: flex;
-		gap: 10px;
-		padding: 10px;
-		border-radius: 10px;
-		background: var(--color-paper-2);
-		border: none;
+		gap: 12px;
+		padding: 12px;
+		border-radius: var(--radius);
+		background: var(--color-paper);
+		border: 1px solid var(--color-line);
+		box-shadow: var(--shadow-sm);
 		text-align: left;
 		cursor: pointer;
 		width: 100%;
-		align-items: center;
+		align-items: stretch;
 		font-family: inherit;
+		transition:
+			box-shadow var(--duration-base),
+			transform var(--duration-base),
+			border-color var(--duration-base);
+	}
+
+	.event-row:hover {
+		border-color: var(--color-orange-100);
+		box-shadow: var(--shadow);
+		transform: translateY(-1px);
 	}
 
 	.event-row--urgent {
@@ -502,67 +545,114 @@
 		outline-offset: 2px;
 	}
 
-	/* Time pill ~48px wide, left column */
-	.time-pill {
+	.time-block {
 		flex-shrink: 0;
-		width: 48px;
-		text-align: center;
+		width: 60px;
+		border-radius: var(--radius-sm);
+		background: var(--color-paper-2);
+		border: 1px solid var(--color-line);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 6px 4px;
+		pointer-events: none;
 	}
 
-	.time-main {
-		display: block;
-		font-size: 15px;
-		font-weight: 700;
+	.time-block__time {
 		color: var(--color-ink);
-		letter-spacing: -0.02em;
+		font-size: 16px;
+		font-weight: 800;
+		letter-spacing: 0;
 		line-height: 1;
 	}
 
-	.time-pill--urgent .time-main {
-		color: var(--color-orange-700);
-		font-weight: 800;
-	}
-
-	.time-anchor {
-		display: block;
-		font-size: 9.5px;
-		color: var(--color-ink-3);
-		font-weight: 600;
-		margin-top: 3px;
-	}
-
-	.time-pill--urgent .time-anchor {
-		color: var(--color-orange-700);
-	}
-
-	.event-body {
+	.event-card__body {
 		flex: 1;
 		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		pointer-events: none;
 	}
 
-	.event-title {
-		font-size: 12.5px;
-		font-weight: 700;
-		color: var(--color-ink);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.event-card__tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		align-items: center;
 	}
 
-	.event-meta {
-		font-size: 11px;
+	.date-tag,
+	.subject-pill {
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 800;
+		letter-spacing: 0.03em;
+		line-height: 1.2;
+		text-transform: uppercase;
+	}
+
+	.date-tag {
+		background: var(--color-orange-50);
+		color: var(--color-orange-700);
+		padding: 2px 7px;
+	}
+
+	.subject-pill {
+		background: var(--color-paper-2);
+		border: 1px solid var(--color-line);
 		color: var(--color-ink-2);
-		margin-top: 2px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		padding: 2px 7px;
 	}
 
-	.event-chevron {
+	.subject-pill--static {
+		pointer-events: none;
+		cursor: default;
+	}
+
+	.event-card__title {
+		margin: 0;
+		color: var(--color-ink);
+		font-size: 14px;
+		font-weight: 800;
+		letter-spacing: 0;
+		line-height: 1.3;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.event-card__meta {
+		color: var(--color-ink-3);
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		min-width: 0;
+		font-size: 12px;
+		line-height: 1.35;
+		pointer-events: none;
+	}
+
+	.event-card__meta-icon {
+		width: 12px;
+		height: 12px;
 		color: var(--color-ink-4);
 		flex-shrink: 0;
 		display: grid;
 		place-items: center;
+	}
+
+	.event-card__meta-icon :global(svg) {
+		width: 12px;
+		height: 12px;
+	}
+
+	.meta-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	/* ── Open-place CTA (full mode) ────────────────────────────────────── */

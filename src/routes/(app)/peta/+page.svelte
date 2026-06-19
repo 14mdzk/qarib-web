@@ -26,17 +26,17 @@
 		MAX_RADIUS_KM,
 		RADIUS_STEPS_KM
 	} from '$domains/events/store.svelte.js';
-	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
+	import { defineEventListQuery, defineNearbyInfiniteQuery } from '$domains/events/queries.js';
 	import { definePlaceListQuery } from '$domains/places/queries.js';
 	import { defineSubjectListQuery } from '$domains/subject/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
 	import {
-		groupFuturePlaces,
 		groupOccurrencesToPlacePins,
 		mergeNearbyPlacesWithEventPins
 	} from '$domains/events/place-pins.js';
 	import type { EventRecurringResponseWithPlace } from '$domains/events/schema.js';
 	import type { SubjectResponse } from '$domains/subject/schema.js';
+	import { dateModeToInitialPinDay, dateRangeForMode, selectedIsoForMode } from './date-mode.js';
 	import {
 		CalendarDays,
 		ChevronLeft,
@@ -60,8 +60,10 @@
 	let todayIso = $state<string | null>(null);
 	let activeFilterSheet = $state<'date' | 'subject' | 'radius' | null>(null);
 	let locationNoticeDismissed = $state(false);
+	let emptySheetDismissedForKey = $state<string | null>(null);
 	let customDatePickerOpen = $state(false);
 	let calendarMonth = $state<string | null>(null);
+	let recenterMapKey = $state(0);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
@@ -90,6 +92,13 @@
 		if (!iso || iso === dateStrip[0]?.iso) return m.peta_filter_date_today();
 		if (iso === tomorrowIso) return m.peta_filter_date_tomorrow();
 		return formatIsoDate(iso, { day: 'numeric', month: 'short' });
+	}
+
+	function formatDateModeChip(): string {
+		if (eventsView.selectedDateMode === 'today') return m.peta_filter_date_today();
+		if (eventsView.selectedDateMode === 'tomorrow') return m.peta_filter_date_tomorrow();
+		if (eventsView.selectedDateMode === 'week') return m.peta_filter_date_week();
+		return formatDateChip(eventsView.selectedCustomDate);
 	}
 
 	function formatFullDate(iso: string): string {
@@ -121,14 +130,6 @@
 		return days;
 	}
 
-	function futureRange(): { date_from: string; date_to: string } | null {
-		if (!tomorrowIso) return null;
-		const start = toDateRange(tomorrowIso);
-		const futureEnd = addDaysIso(14);
-		const end = toDateRange(futureEnd ?? tomorrowIso);
-		return { date_from: start.date_from, date_to: end.date_to };
-	}
-
 	function nextRadiusKm(current: number): number {
 		return RADIUS_STEPS_KM.find((step) => step > current) ?? MAX_RADIUS_KM;
 	}
@@ -145,8 +146,12 @@
 	// Svelte-query: cursor-paginated nearby feed (state-management.md rule)
 	// ---------------------------------------------------------------------------
 
-	const activeDay = $derived(eventsView.selectedDate ?? todayIso);
-	const dateRange = $derived(activeDay ? toDateRange(activeDay) : null);
+	const dateSelection = $derived({
+		mode: eventsView.selectedDateMode,
+		customDate: eventsView.selectedCustomDate
+	});
+	const activeDay = $derived(todayIso ? selectedIsoForMode(todayIso, dateSelection) : null);
+	const dateRange = $derived(todayIso ? dateRangeForMode(todayIso, dateSelection) : null);
 	const dateReady = $derived(activeDay != null && dateRange != null);
 
 	const isManual = $derived(pref.active?.mode === 'manual');
@@ -181,7 +186,7 @@
 		limit: 30
 	});
 	const nearbyPlacesQuery = definePlaceListQuery(() => nearbyPlaceArgs, {
-		enabled: () => browserReady && eventsView.selectedSubjectId == null,
+		enabled: () => browserReady,
 		staleTime: 60_000
 	});
 	const nearbyPlaces = $derived(nearbyPlacesQuery.data?.data ?? []);
@@ -200,27 +205,16 @@
 			(location.permission === 'denied' || location.permission === 'unavailable')
 	);
 
-	const fallbackDateRange = $derived(futureRange());
-	const fallbackArgs = $derived({
-		lat: isManual ? undefined : location.center?.lat,
-		lng: isManual ? undefined : location.center?.lng,
-		radius_km: isManual ? undefined : MAX_RADIUS_KM,
-		region_id: regionId,
-		subject_id: eventsView.selectedSubjectId ?? undefined,
-		date_from: fallbackDateRange?.date_from,
-		date_to: fallbackDateRange?.date_to,
-		expand: 'place',
-		limit: 30
-	});
-	const fallbackEnabled = $derived(
-		dateReady && query.isSuccess && events.length === 0 && !showLocationNotice
-	);
-	const fallbackQuery = defineNearbyInfiniteQuery(() => ({
-		args: fallbackArgs,
-		enabled: fallbackEnabled
-	}));
-	const fallbackEvents = $derived(
-		(fallbackQuery.data?.pages ?? []).flatMap((p) => p.data) as EventRecurringResponseWithPlace[]
+	const queryContextKey = $derived(
+		[
+			activeDay ?? '',
+			eventsView.selectedDateMode,
+			eventsView.selectedCustomDate ?? '',
+			eventsView.selectedRadiusKm,
+			eventsView.selectedSubjectId ?? '',
+			(location.center?.lat ?? 0).toFixed(5),
+			(location.center?.lng ?? 0).toFixed(5)
+		].join('|')
 	);
 
 	// ---------------------------------------------------------------------------
@@ -234,7 +228,10 @@
 		})
 	);
 	const placeOnlyPinsSource = $derived(
-		query.isSuccess && eventsView.selectedSubjectId == null ? nearbyPlaces : []
+		query.isSuccess &&
+			(eventsView.selectedSubjectId == null || emptySheetDismissedForKey === queryContextKey)
+			? nearbyPlaces
+			: []
 	);
 	const placePins = $derived(
 		mergeNearbyPlacesWithEventPins(eventPlacePins, placeOnlyPinsSource, m.pin_label_place()).map(
@@ -267,7 +264,7 @@
 	const filterChips = $derived<FilterChip[]>([
 		{
 			key: 'date',
-			label: m.peta_filter_date_label({ value: formatDateChip(activeDay) }),
+			label: m.peta_filter_date_label({ value: formatDateModeChip() }),
 			active: activeFilterSheet === 'date'
 		},
 		{
@@ -297,32 +294,60 @@
 	);
 
 	// ---------------------------------------------------------------------------
-	// Pin sheet data — built from the selected place's occurrences
+	// Pin sheet data — built from a selected-place 7-day occurrence query.
 	// ---------------------------------------------------------------------------
-	const selectedPlaceOccurrences = $derived(
-		eventsView.selectedPlaceId != null
-			? (events as EventRecurringResponseWithPlace[]).filter(
-					(e) => e.place?.id === eventsView.selectedPlaceId
-				)
-			: []
+	const selectedPlaceRange = $derived(
+		todayIso
+			? {
+					date_from: toDateRange(todayIso).date_from,
+					date_to: toDateRange(addIsoDateDays(todayIso, 7)).date_to
+				}
+			: null
 	);
-	const selectedPlaceHasTodayEvents = $derived(selectedPlaceOccurrences.length > 0);
+
+	const selectedPlaceEventsQuery = defineEventListQuery(
+		() => ({
+			place_id: eventsView.selectedPlaceId ?? undefined,
+			subject_id: eventsView.selectedSubjectId ?? undefined,
+			date_from: selectedPlaceRange?.date_from,
+			date_to: selectedPlaceRange?.date_to,
+			expand: 'place,asatidz',
+			limit: 30
+		}),
+		{
+			enabled: () =>
+				browserReady && eventsView.selectedPlaceId != null && selectedPlaceRange != null,
+			staleTime: 60_000
+		}
+	);
+
+	const selectedPlaceOccurrences = $derived(
+		(selectedPlaceEventsQuery.data?.data ?? []) as EventRecurringResponseWithPlace[]
+	);
+
+	const selectedMapOccurrence = $derived(
+		(events as EventRecurringResponseWithPlace[]).find(
+			(e) => e.place?.id === eventsView.selectedPlaceId
+		) ?? null
+	);
+
+	const selectedNearbyPlace = $derived(
+		nearbyPlaces.find((place) => place.id === eventsView.selectedPlaceId) ?? null
+	);
+	const selectedSubjectLabel = $derived(selectedSubject ? l10n(selectedSubject.name) : '');
 
 	const sheetPlace = $derived<SheetPlace | null>(
-		selectedPlaceOccurrences.length > 0
-			? (() => {
-					const place = selectedPlaceOccurrences[0].place;
-					const distKm =
-						typeof selectedPlaceOccurrences[0].distance_km === 'number'
-							? selectedPlaceOccurrences[0].distance_km
-							: null;
-					return {
-						name: l10n(place.name),
-						distanceLabel: distKm != null ? formatDistance(distKm) : '',
-						address: place.address ?? undefined
-					};
-				})()
-			: null
+		(() => {
+			const occurrence = selectedPlaceOccurrences[0] ?? selectedMapOccurrence;
+			const place = occurrence?.place ?? selectedNearbyPlace;
+			if (!place) return null;
+			const distKm = typeof occurrence?.distance_km === 'number' ? occurrence.distance_km : null;
+			return {
+				name: l10n(place.name),
+				distanceLabel: distKm != null ? formatDistance(distKm) : '',
+				address: place.address ?? undefined
+			};
+		})()
 	);
 
 	const sheetEvents = $derived<SheetEvent[]>(
@@ -332,7 +357,13 @@
 				id: e.id,
 				title: l10n(e.name),
 				timeLabel: formatTime(e.date_start),
-				ustadzName: '',
+				anchorLabel: formatIsoDate(toLocalIsoDate(new Date(e.date_start)), {
+					weekday: 'short',
+					day: 'numeric',
+					month: 'short'
+				}),
+				ustadzName: l10n(e.asatidz?.alias_name ?? e.asatidz?.name) || l10n(e.asatidz?.name),
+				subjectLabel: selectedSubjectLabel || undefined,
 				tier: deriveTier(e.date_start),
 				dateStart: e.date_start,
 				// occurrences without a series event_id are not linkable
@@ -347,14 +378,12 @@
 	let activePinDay = $state<'today' | 'tomorrow' | 'week'>('today');
 	let lastQueryContextKey = $state<string | null>(null);
 
-	const queryContextKey = $derived(
-		[
-			activeDay ?? '',
-			eventsView.selectedRadiusKm,
-			eventsView.selectedSubjectId ?? '',
-			(location.center?.lat ?? 0).toFixed(5),
-			(location.center?.lng ?? 0).toFixed(5)
-		].join('|')
+	const showEmptySheet = $derived(
+		!query.isPending &&
+			!query.isError &&
+			events.length === 0 &&
+			!showLocationNotice &&
+			emptySheetDismissedForKey !== queryContextKey
 	);
 
 	$effect(() => {
@@ -373,7 +402,10 @@
 	function navigateToEvent(occurrenceId: string | number): void {
 		// Navigate to the EVENT series UUID, not the occurrence int id.
 		// occurrences without a series event_id are not linkable.
-		const occ = (events as EventRecurringResponseWithPlace[]).find((e) => e.id === occurrenceId);
+		const occ = [
+			...selectedPlaceOccurrences,
+			...(events as EventRecurringResponseWithPlace[])
+		].find((e) => e.id === occurrenceId);
 		const eventId = occ?.event_id;
 		if (!eventId || typeof eventId !== 'string' || eventId.trim() === '') {
 			// No valid series event_id — row should have been non-actionable; bail out.
@@ -386,8 +418,19 @@
 		goto(resolve('/(app)/tempat/[id]', { id: placeId }));
 	}
 
-	function chooseDate(iso: string | null): void {
-		eventsView.selectDate(iso);
+	function locateAndRecenter(): void {
+		recenterMapKey += 1;
+		location.requestGps();
+	}
+
+	function chooseDateMode(mode: 'today' | 'tomorrow' | 'week'): void {
+		eventsView.selectDateMode(mode);
+		customDatePickerOpen = false;
+		activeFilterSheet = null;
+	}
+
+	function chooseCustomDate(iso: string): void {
+		eventsView.selectDateMode('custom', iso);
 		customDatePickerOpen = false;
 		activeFilterSheet = null;
 	}
@@ -408,17 +451,10 @@
 
 	function handlePinClick(id: string | number): void {
 		const placeId = typeof id === 'string' ? id : String(id);
-		const hasTodayEvent = (events as EventRecurringResponseWithPlace[]).some(
-			(e) => e.place?.id === placeId
-		);
-		if (hasTodayEvent) {
-			eventsView.selectPlace(placeId);
-		} else {
-			navigateToPlace(placeId);
-		}
+		eventsView.selectPlace(placeId);
+		activePinDay = dateModeToInitialPinDay(eventsView.selectedDateMode);
 	}
 
-	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
 	const calendarDays = $derived(calendarMonth ? buildCalendarGrid(calendarMonth) : []);
 	const calendarMonthLabel = $derived(
 		calendarMonth ? formatIsoDate(calendarMonth, { month: 'long', year: 'numeric' }) : ''
@@ -460,6 +496,7 @@
 				zoom={13}
 				pins={placePins}
 				{userLocation}
+				recenterKey={recenterMapKey}
 				onpinclick={handlePinClick}
 			/>
 		</ContentDim>
@@ -469,6 +506,7 @@
 			zoom={13}
 			pins={placePins}
 			{userLocation}
+			recenterKey={recenterMapKey}
 			onpinclick={handlePinClick}
 		/>
 	{/if}
@@ -569,7 +607,7 @@
 	{/if}
 
 	<!-- Empty state: in-map bottom sheet (resolved, 0 events) -->
-	{#if !query.isPending && !query.isError && events.length === 0 && !showLocationNotice}
+	{#if showEmptySheet}
 		<div
 			class="empty-sheet"
 			role="status"
@@ -584,10 +622,15 @@
 				<div class="edge-sheet__copy">
 					<p id="peta-empty-title" class="edge-sheet__title">{m.peta_map_empty_title()}</p>
 					<p id="peta-empty-body" class="edge-sheet__body">
-						{m.peta_map_empty_body({
-							radius: eventsView.selectedRadiusKm,
-							nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
-						})}
+						{eventsView.selectedDateMode === 'week'
+							? m.peta_map_empty_week_body({
+									radius: eventsView.selectedRadiusKm,
+									nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
+								})
+							: m.peta_map_empty_body({
+									radius: eventsView.selectedRadiusKm,
+									nextRadius: nextRadiusKm(eventsView.selectedRadiusKm)
+								})}
 					</p>
 				</div>
 			</div>
@@ -605,32 +648,13 @@
 				</button>
 				<button
 					class="edge-sheet__button edge-sheet__button--secondary"
-					onclick={() => chooseDate(tomorrowIso)}
+					onclick={() => {
+						emptySheetDismissedForKey = queryContextKey;
+					}}
 				>
-					{m.peta_map_empty_tomorrow_action()}
+					{m.peta_map_empty_places_action()}
 				</button>
 			</div>
-			{#if fallbackPlaces.length > 0}
-				<div class="fallback-places">
-					<p class="fallback-places__title">{m.peta_future_places_title()}</p>
-					{#each fallbackPlaces as place (place.id)}
-						<button class="fallback-place" onclick={() => navigateToPlace(place.id)}>
-							<span class="fallback-place__pin" aria-hidden="true">
-								<MapPin class="size-4" />
-							</span>
-							<span class="fallback-place__meta">
-								<span class="fallback-place__name">{place.name}</span>
-								<span class="fallback-place__sub">
-									{m.peta_future_place_meta({
-										count: place.count,
-										date: place.nextLabel
-									})}
-								</span>
-							</span>
-						</button>
-					{/each}
-				</div>
-			{/if}
 		</div>
 	{/if}
 
@@ -649,11 +673,23 @@
 				<span>{m.peta_date_sheet_title()}</span>
 			</div>
 			<div class="filter-sheet__options">
-				<button class:active={activeDay === dateStrip[0]?.iso} onclick={() => chooseDate(null)}>
+				<button
+					class:active={eventsView.selectedDateMode === 'today'}
+					onclick={() => chooseDateMode('today')}
+				>
 					{m.peta_filter_date_today()}
 				</button>
-				<button class:active={activeDay === tomorrowIso} onclick={() => chooseDate(tomorrowIso)}>
+				<button
+					class:active={eventsView.selectedDateMode === 'tomorrow'}
+					onclick={() => chooseDateMode('tomorrow')}
+				>
 					{m.peta_filter_date_tomorrow()}
+				</button>
+				<button
+					class:active={eventsView.selectedDateMode === 'week'}
+					onclick={() => chooseDateMode('week')}
+				>
+					{m.peta_filter_date_week()}
 				</button>
 				<button onclick={() => (customDatePickerOpen = !customDatePickerOpen)}>
 					{m.peta_filter_date_custom()}
@@ -680,9 +716,10 @@
 							<button
 								type="button"
 								class:outside={!day.inMonth}
-								class:active={day.iso === activeDay}
+								class:active={eventsView.selectedDateMode === 'custom' &&
+									day.iso === eventsView.selectedCustomDate}
 								aria-label={m.peta_date_pick_label({ date: formatFullDate(day.iso) })}
-								onclick={() => chooseDate(day.iso)}
+								onclick={() => chooseCustomDate(day.iso)}
 							>
 								{day.label}
 							</button>
@@ -752,10 +789,10 @@
 
 	<!-- GPS FAB — bottom-right, lifts above pin sheet when open.
 	     --map-fab-bottom inherited from the container via CSS variable cascade. -->
-	<MapFab onlocate={() => location.requestGps()} loading={location.requesting} />
+	<MapFab onlocate={locateAndRecenter} loading={location.requesting} />
 
 	<!-- Pin sheet — shown when a place is selected -->
-	{#if eventsView.selectedPlaceId != null && sheetPlace != null && selectedPlaceHasTodayEvents}
+	{#if eventsView.selectedPlaceId != null && sheetPlace != null}
 		<PinSheet
 			place={sheetPlace}
 			events={sheetEvents}
@@ -775,13 +812,6 @@
 				if (placeId) navigateToPlace(placeId);
 			}}
 		/>
-		<!-- Scrim: tap outside sheet to close -->
-		<button
-			class="absolute inset-0 z-[998] cursor-default bg-transparent"
-			style="bottom: {eventsView.sheetMode === 'full' ? '72%' : '40%'};"
-			aria-label={m.pin_sheet_collapse()}
-			onclick={() => eventsView.closeSheet()}
-		></button>
 	{/if}
 </div>
 
@@ -892,8 +922,7 @@
 	}
 
 	.edge-sheet__button:focus-visible,
-	.filter-sheet button:focus-visible,
-	.fallback-place:focus-visible {
+	.filter-sheet button:focus-visible {
 		outline: 2px solid var(--color-orange);
 		outline-offset: 2px;
 	}
@@ -902,71 +931,6 @@
 		display: flex;
 		gap: 10px;
 		align-items: flex-start;
-	}
-
-	.fallback-places {
-		margin-top: 12px;
-		padding-top: 10px;
-		border-top: 1px solid var(--color-line);
-	}
-
-	.fallback-places__title {
-		margin: 0 0 8px;
-		color: var(--color-ink-3);
-		font-size: 11px;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.fallback-place {
-		width: 100%;
-		display: flex;
-		gap: 9px;
-		align-items: center;
-		border: 0;
-		border-radius: var(--radius-sm);
-		background: transparent;
-		padding: 7px 6px;
-		text-align: left;
-		font-family: inherit;
-		cursor: pointer;
-	}
-
-	.fallback-place:hover {
-		background: var(--color-paper-2);
-	}
-
-	.fallback-place__pin {
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		display: grid;
-		place-items: center;
-		background: var(--color-orange-50);
-		color: var(--color-orange-700);
-		flex-shrink: 0;
-	}
-
-	.fallback-place__meta {
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-
-	.fallback-place__name {
-		color: var(--color-ink);
-		font-size: 12.5px;
-		font-weight: 800;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.fallback-place__sub {
-		color: var(--color-ink-3);
-		font-size: 11px;
 	}
 
 	.filter-sheet {
