@@ -106,6 +106,67 @@ function defaultOccurrences() {
 	];
 }
 
+function selectedPlaceOccurrences(placeId: string | null, subjectId: string | null) {
+	if (placeId === 'place-uuid-1') {
+		return [
+			occurrence({
+				id: 9001,
+				event_id: 'uuid-place-week-a',
+				name: { id: 'Kajian Pekanan Tafsir' },
+				date_start: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+				date_prayer: 4,
+				distance_km: null,
+				asatidz: {
+					id: 'asatidz-ahmad',
+					slug: 'ustadz-ahmad',
+					name: { id: 'Ustadz Ahmad' },
+					alias_name: { id: 'Ustadz Ahmad' },
+					gender: 1,
+					is_active: true
+				},
+				place: {
+					id: 'place-uuid-1',
+					slug: 'masjid-al-falah',
+					name: { id: 'Masjid Al-Falah', en: 'Masjid Al-Falah' },
+					address: 'Jl. Contoh No. 1, Cirebon',
+					lat: -6.732,
+					lng: 108.5523
+				}
+			})
+		];
+	}
+
+	if (placeId === 'place-uuid-2' && subjectId !== 'subject-empty') {
+		return [
+			occurrence({
+				id: 9002,
+				event_id: 'uuid-place-today-b',
+				name: { id: 'Kajian Harian' },
+				date_start: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+				distance_km: null,
+				asatidz: {
+					id: 'asatidz-budi',
+					slug: 'ustadz-budi',
+					name: { id: 'Ustadz Budi' },
+					alias_name: { id: 'Ustadz Budi' },
+					gender: 1,
+					is_active: true
+				},
+				place: {
+					id: 'place-uuid-2',
+					slug: 'masjid-jami-cirebon',
+					name: { id: "Masjid Jami' Cirebon", en: "Masjid Jami' Cirebon" },
+					address: "Jl. Jami' No. 5, Cirebon",
+					lat: -6.74,
+					lng: 108.561
+				}
+			})
+		];
+	}
+
+	return [];
+}
+
 // ---------------------------------------------------------------------------
 // Route definitions
 // ---------------------------------------------------------------------------
@@ -284,8 +345,11 @@ prefixRoutes.push({
 prefixRoutes.push({
 	method: 'GET',
 	prefix: '/events',
-	handler: (_req, res) => {
-		json(res, 200, paginated([]));
+	handler: (req, res) => {
+		const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+		const placeId = params.get('place_id');
+		const subjectId = params.get('subject_id');
+		json(res, 200, paginated(selectedPlaceOccurrences(placeId, subjectId)));
 	}
 });
 

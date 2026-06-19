@@ -12,7 +12,7 @@
  *   - The GPS FAB is rendered.
  *   - A pin click opens a PinSheet (peek mode) with place name visible.
  *   - PinSheet can be expanded via the chevron button.
- *   - PinSheet can be closed via the scrim/collapse button.
+ *   - The map remains interactive while PinSheet is open.
  *
  * Note: Leaflet requires a real browser context; tile endpoints may return
  * errors (test key / network) but the map container and markers still render
@@ -31,6 +31,16 @@ function addDaysIso(days: number): string {
 	const month = String(date.getMonth() + 1).padStart(2, '0');
 	const day = String(date.getDate()).padStart(2, '0');
 	return `${year}-${month}-${day}`;
+}
+
+function formatSheetDateLabel(days: number): string {
+	const iso = addDaysIso(days);
+	const [year, month, day] = iso.split('-').map(Number);
+	return new Intl.DateTimeFormat('id-ID', {
+		weekday: 'short',
+		day: 'numeric',
+		month: 'short'
+	}).format(new Date(year, month - 1, day, 12));
 }
 
 async function useCirebonGeolocation(page: Page): Promise<void> {
@@ -463,7 +473,32 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(page).toHaveURL(/\/peta$/);
 		const sheet = page.getByRole('complementary', { name: /Masjid Jami' As-Sunnah Cirebon/ });
 		await expect(sheet).toBeVisible();
-		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toBeVisible();
+		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toHaveCount(0);
+	});
+
+	test('pin sheet week events show date, scholar, subject, and navigate to event detail', async ({
+		page
+	}) => {
+		await page.goto('/peta');
+		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
+
+		await selectSubject(page, 'Tafsir', 'subject-tafsir');
+		const marker = eventPinMarkers(page).first();
+		await expect(marker).toBeVisible({ timeout: 10_000 });
+		await marker.click();
+
+		const sheet = page.getByRole('complementary', { name: /Masjid Al-Falah/ });
+		await expect(sheet).toBeVisible({ timeout: 5_000 });
+		await sheet.getByRole('button', { name: /Lihat semua kajian/i }).click();
+		await sheet.getByRole('button', { name: /Minggu ini/i }).click();
+
+		const eventRow = sheet.getByRole('button', { name: /Kajian Pekanan Tafsir/i });
+		await expect(eventRow).toContainText(formatSheetDateLabel(3));
+		await expect(eventRow).toContainText('Ustadz Ahmad');
+		await expect(eventRow).toContainText('Tafsir');
+
+		await eventRow.click();
+		await expect(page).toHaveURL(/\/kajian\/uuid-place-week-a$/);
 	});
 
 	test('GPS FAB is rendered', async ({ page }) => {
@@ -538,24 +573,27 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		});
 	});
 
-	test('scrim closes pin sheet', async ({ page }) => {
+	test('clicking another pin switches PinSheet without a blocking scrim click', async ({
+		page
+	}) => {
 		await page.goto('/peta');
 
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
-		const firstMarker = page.locator('.leaflet-marker-icon').first();
+		const firstMarker = eventPinMarkers(page).first();
+		const secondMarker = eventPinMarkers(page).nth(1);
 		await expect(firstMarker).toBeVisible({ timeout: 10_000 });
+		await expect(secondMarker).toBeVisible({ timeout: 10_000 });
 		await firstMarker.click();
 
-		const sheet = page.getByRole('complementary').first();
-		await expect(sheet).toBeVisible({ timeout: 5_000 });
+		await expect(page.getByRole('complementary', { name: /Masjid Al-Falah/ })).toBeVisible({
+			timeout: 5_000
+		});
 
-		// Click the scrim button by its specific aria-label (not the chevron inside the sheet).
-		// The scrim is a button outside the sheet with aria-label matching pin_sheet_collapse.
-		await page.getByRole('button', { name: 'Tutup', exact: true }).last().click();
-
-		// Sheet should be gone.
-		await expect(sheet).not.toBeVisible({ timeout: 3_000 });
+		await secondMarker.click();
+		await expect(page.getByRole('complementary', { name: /Masjid Jami' Cirebon/ })).toBeVisible({
+			timeout: 3_000
+		});
 	});
 });
 

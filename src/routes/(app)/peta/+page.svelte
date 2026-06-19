@@ -310,7 +310,7 @@
 			subject_id: eventsView.selectedSubjectId ?? undefined,
 			date_from: selectedPlaceRange?.date_from,
 			date_to: selectedPlaceRange?.date_to,
-			expand: 'place',
+			expand: 'place,asatidz',
 			limit: 30
 		}),
 		{
@@ -333,6 +333,7 @@
 	const selectedNearbyPlace = $derived(
 		nearbyPlaces.find((place) => place.id === eventsView.selectedPlaceId) ?? null
 	);
+	const selectedSubjectLabel = $derived(selectedSubject ? l10n(selectedSubject.name) : '');
 
 	const sheetPlace = $derived<SheetPlace | null>(
 		(() => {
@@ -355,7 +356,13 @@
 				id: e.id,
 				title: l10n(e.name),
 				timeLabel: formatTime(e.date_start),
-				ustadzName: '',
+				anchorLabel: formatIsoDate(toLocalIsoDate(new Date(e.date_start)), {
+					weekday: 'short',
+					day: 'numeric',
+					month: 'short'
+				}),
+				ustadzName: l10n(e.asatidz?.alias_name ?? e.asatidz?.name) || l10n(e.asatidz?.name),
+				subjectLabel: selectedSubjectLabel || undefined,
 				tier: deriveTier(e.date_start),
 				dateStart: e.date_start,
 				// occurrences without a series event_id are not linkable
@@ -394,7 +401,10 @@
 	function navigateToEvent(occurrenceId: string | number): void {
 		// Navigate to the EVENT series UUID, not the occurrence int id.
 		// occurrences without a series event_id are not linkable.
-		const occ = (events as EventRecurringResponseWithPlace[]).find((e) => e.id === occurrenceId);
+		const occ = [
+			...selectedPlaceOccurrences,
+			...(events as EventRecurringResponseWithPlace[])
+		].find((e) => e.id === occurrenceId);
 		const eventId = occ?.event_id;
 		if (!eventId || typeof eventId !== 'string' || eventId.trim() === '') {
 			// No valid series event_id — row should have been non-actionable; bail out.
@@ -794,13 +804,6 @@
 				if (placeId) navigateToPlace(placeId);
 			}}
 		/>
-		<!-- Scrim: tap outside sheet to close -->
-		<button
-			class="absolute inset-0 z-[998] cursor-default bg-transparent"
-			style="bottom: {eventsView.sheetMode === 'full' ? '72%' : '40%'};"
-			aria-label={m.pin_sheet_collapse()}
-			onclick={() => eventsView.closeSheet()}
-		></button>
 	{/if}
 </div>
 

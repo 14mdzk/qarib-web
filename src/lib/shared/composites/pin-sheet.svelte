@@ -105,6 +105,10 @@
 		return '';
 	}
 
+	function eventMeta(event: SheetEvent): string {
+		return [event.ustadzName, event.subjectLabel].filter(Boolean).join(' · ');
+	}
+
 	// ---------------------------------------------------------------------------
 	// Day filter chips (full mode) — derive counts from real local calendar dates
 	// ---------------------------------------------------------------------------
@@ -224,12 +228,6 @@
 				<div class="empty-events__title">{m.pin_sheet_no_events_title()}</div>
 				<div class="empty-events__body">{m.pin_sheet_no_events_body()}</div>
 			</div>
-
-			<button class="open-place-btn" onclick={onopenplace}>
-				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
-				{@html MOSQUE_SVG}
-				{m.pin_sheet_open_place()}
-			</button>
 		{:else if mode === 'peek' && peekEvent}
 			<!-- Peek: one urgency event row -->
 			<div class="peek-event">
@@ -280,9 +278,9 @@
 						<!-- Event body -->
 						<div class="event-body">
 							<div class="event-title">{event.title}</div>
-							<div class="event-meta">
-								{event.ustadzName}{event.subjectLabel ? ` · ${event.subjectLabel}` : ''}
-							</div>
+							{#if eventMeta(event)}
+								<div class="event-meta">{eventMeta(event)}</div>
+							{/if}
 						</div>
 
 						<!-- Chevron -->
