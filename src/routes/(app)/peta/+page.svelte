@@ -63,6 +63,7 @@
 	let emptySheetDismissedForKey = $state<string | null>(null);
 	let customDatePickerOpen = $state(false);
 	let calendarMonth = $state<string | null>(null);
+	let recenterMapKey = $state(0);
 
 	// ---------------------------------------------------------------------------
 	// Date strip — today + next 6 days
@@ -417,6 +418,11 @@
 		goto(resolve('/(app)/tempat/[id]', { id: placeId }));
 	}
 
+	function locateAndRecenter(): void {
+		recenterMapKey += 1;
+		location.requestGps();
+	}
+
 	function chooseDateMode(mode: 'today' | 'tomorrow' | 'week'): void {
 		eventsView.selectDateMode(mode);
 		customDatePickerOpen = false;
@@ -490,6 +496,7 @@
 				zoom={13}
 				pins={placePins}
 				{userLocation}
+				recenterKey={recenterMapKey}
 				onpinclick={handlePinClick}
 			/>
 		</ContentDim>
@@ -499,6 +506,7 @@
 			zoom={13}
 			pins={placePins}
 			{userLocation}
+			recenterKey={recenterMapKey}
 			onpinclick={handlePinClick}
 		/>
 	{/if}
@@ -781,7 +789,7 @@
 
 	<!-- GPS FAB — bottom-right, lifts above pin sheet when open.
 	     --map-fab-bottom inherited from the container via CSS variable cascade. -->
-	<MapFab onlocate={() => location.requestGps()} loading={location.requesting} />
+	<MapFab onlocate={locateAndRecenter} loading={location.requesting} />
 
 	<!-- Pin sheet — shown when a place is selected -->
 	{#if eventsView.selectedPlaceId != null && sheetPlace != null}

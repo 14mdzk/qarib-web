@@ -142,6 +142,28 @@ function placePinMarkers(page: Page) {
 	return page.locator('.leaflet-marker-icon').filter({ hasText: /Masjid/ });
 }
 
+function userLocationMarker(page: Page) {
+	return page.locator('.leaflet-marker-icon').filter({
+		has: page.locator('div[style*="var(--color-blue)"]')
+	});
+}
+
+async function markerDistanceFromMapCenter(page: Page): Promise<number> {
+	const markerBox = await userLocationMarker(page).first().boundingBox();
+	const mapBox = await page
+		.getByRole('application', { name: 'Peta kajian interaktif' })
+		.boundingBox();
+	expect(markerBox).not.toBeNull();
+	expect(mapBox).not.toBeNull();
+	if (!markerBox || !mapBox) return Number.POSITIVE_INFINITY;
+
+	const markerCenterX = markerBox.x + markerBox.width / 2;
+	const markerCenterY = markerBox.y + markerBox.height / 2;
+	const mapCenterX = mapBox.x + mapBox.width / 2;
+	const mapCenterY = mapBox.y + mapBox.height / 2;
+	return Math.hypot(markerCenterX - mapCenterX, markerCenterY - mapCenterY);
+}
+
 async function openDateSheet(page: Page): Promise<void> {
 	await filterToolbar(page).getByRole('button').first().click();
 	await expect(page.getByRole('dialog', { name: 'Pilih tanggal' })).toBeVisible();
@@ -514,6 +536,36 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 
 		// MapFab renders a button with the GPS aria-label.
 		await expect(page.getByRole('button', { name: /Lokasiku/i }).first()).toBeVisible();
+	});
+
+	test('GPS FAB recenters the map on the user location after manual pan', async ({ page }) => {
+		await page.goto('/peta');
+		const map = page.getByRole('application', { name: 'Peta kajian interaktif' });
+		await expect(map).toBeVisible({ timeout: 10_000 });
+		await expect(userLocationMarker(page).first()).toBeVisible({ timeout: 10_000 });
+
+		const initialDistance = await markerDistanceFromMapCenter(page);
+		expect(initialDistance).toBeLessThan(32);
+
+		const mapBox = await map.boundingBox();
+		expect(mapBox).not.toBeNull();
+		if (!mapBox) return;
+		await page.mouse.move(mapBox.x + mapBox.width / 2, mapBox.y + mapBox.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(mapBox.x + mapBox.width / 2 + 180, mapBox.y + mapBox.height / 2 + 120, {
+			steps: 8
+		});
+		await page.mouse.up();
+
+		await expect(async () => {
+			expect(await markerDistanceFromMapCenter(page)).toBeGreaterThan(80);
+		}).toPass();
+
+		await page.getByRole('button', { name: /Lokasiku/i }).click();
+
+		await expect(async () => {
+			expect(await markerDistanceFromMapCenter(page)).toBeLessThan(32);
+		}).toPass();
 	});
 
 	test('custom zoom controls are bottom-right and Leaflet default zoom control is absent', async ({

@@ -15,6 +15,8 @@
 	 *   - `onpinclick`    — callback fired with the pin id when a pin is clicked.
 	 *   - `clusters`      — optional array of {lat, lng, count} for cluster markers.
 	 *                       // TODO(B-followup): wire real clustering (leaflet.markercluster is a dep decision)
+	 *   - `recenterKey`   — bump to force panning back to `center` even when
+	 *                       coordinates did not change.
 	 *
 	 * Tile layer: `/api/tiles/{z}/{x}/{y}{r}.png` (BFF proxy; ADR 0013).
 	 * Attribution control is rendered (required by Stadia free tier).
@@ -53,10 +55,19 @@
 		pins?: Pin[];
 		userLocation?: [number, number];
 		clusters?: Cluster[];
+		recenterKey?: number;
 		onpinclick?: (id: string | number) => void;
 	}
 
-	let { center, zoom = 13, pins = [], userLocation, clusters, onpinclick }: Props = $props();
+	let {
+		center,
+		zoom = 13,
+		pins = [],
+		userLocation,
+		clusters,
+		recenterKey = 0,
+		onpinclick
+	}: Props = $props();
 
 	let mapContainer: HTMLDivElement | undefined = $state();
 	const pinSignature = $derived(
@@ -341,6 +352,7 @@
 
 	// Reactively fly to the new center when the prop changes (post-mount only).
 	$effect(() => {
+		void recenterKey;
 		if (map) {
 			if (reducedMotion) {
 				map.setView(center, zoom);
