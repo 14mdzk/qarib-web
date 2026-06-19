@@ -37,6 +37,7 @@
 	} from '$domains/events/place-pins.js';
 	import type { EventRecurringResponseWithPlace } from '$domains/events/schema.js';
 	import type { SubjectResponse } from '$domains/subject/schema.js';
+	import { dateRangeForMode, selectedIsoForMode } from './date-mode.js';
 	import {
 		CalendarDays,
 		ChevronLeft,
@@ -92,6 +93,13 @@
 		return formatIsoDate(iso, { day: 'numeric', month: 'short' });
 	}
 
+	function formatDateModeChip(): string {
+		if (eventsView.selectedDateMode === 'today') return m.peta_filter_date_today();
+		if (eventsView.selectedDateMode === 'tomorrow') return m.peta_filter_date_tomorrow();
+		if (eventsView.selectedDateMode === 'week') return m.peta_filter_date_week();
+		return formatDateChip(eventsView.selectedCustomDate);
+	}
+
 	function formatFullDate(iso: string): string {
 		return formatIsoDate(iso, {
 			weekday: 'long',
@@ -145,8 +153,12 @@
 	// Svelte-query: cursor-paginated nearby feed (state-management.md rule)
 	// ---------------------------------------------------------------------------
 
-	const activeDay = $derived(eventsView.selectedDate ?? todayIso);
-	const dateRange = $derived(activeDay ? toDateRange(activeDay) : null);
+	const dateSelection = $derived({
+		mode: eventsView.selectedDateMode,
+		customDate: eventsView.selectedCustomDate
+	});
+	const activeDay = $derived(todayIso ? selectedIsoForMode(todayIso, dateSelection) : null);
+	const dateRange = $derived(todayIso ? dateRangeForMode(todayIso, dateSelection) : null);
 	const dateReady = $derived(activeDay != null && dateRange != null);
 
 	const isManual = $derived(pref.active?.mode === 'manual');
@@ -267,7 +279,7 @@
 	const filterChips = $derived<FilterChip[]>([
 		{
 			key: 'date',
-			label: m.peta_filter_date_label({ value: formatDateChip(activeDay) }),
+			label: m.peta_filter_date_label({ value: formatDateModeChip() }),
 			active: activeFilterSheet === 'date'
 		},
 		{
@@ -350,6 +362,8 @@
 	const queryContextKey = $derived(
 		[
 			activeDay ?? '',
+			eventsView.selectedDateMode,
+			eventsView.selectedCustomDate ?? '',
 			eventsView.selectedRadiusKm,
 			eventsView.selectedSubjectId ?? '',
 			(location.center?.lat ?? 0).toFixed(5),
@@ -386,8 +400,14 @@
 		goto(resolve('/(app)/tempat/[id]', { id: placeId }));
 	}
 
-	function chooseDate(iso: string | null): void {
-		eventsView.selectDate(iso);
+	function chooseDateMode(mode: 'today' | 'tomorrow' | 'week'): void {
+		eventsView.selectDateMode(mode);
+		customDatePickerOpen = false;
+		activeFilterSheet = null;
+	}
+
+	function chooseCustomDate(iso: string): void {
+		eventsView.selectDateMode('custom', iso);
 		customDatePickerOpen = false;
 		activeFilterSheet = null;
 	}
@@ -605,7 +625,7 @@
 				</button>
 				<button
 					class="edge-sheet__button edge-sheet__button--secondary"
-					onclick={() => chooseDate(tomorrowIso)}
+					onclick={() => chooseDateMode('tomorrow')}
 				>
 					{m.peta_map_empty_tomorrow_action()}
 				</button>
@@ -649,11 +669,23 @@
 				<span>{m.peta_date_sheet_title()}</span>
 			</div>
 			<div class="filter-sheet__options">
-				<button class:active={activeDay === dateStrip[0]?.iso} onclick={() => chooseDate(null)}>
+				<button
+					class:active={eventsView.selectedDateMode === 'today'}
+					onclick={() => chooseDateMode('today')}
+				>
 					{m.peta_filter_date_today()}
 				</button>
-				<button class:active={activeDay === tomorrowIso} onclick={() => chooseDate(tomorrowIso)}>
+				<button
+					class:active={eventsView.selectedDateMode === 'tomorrow'}
+					onclick={() => chooseDateMode('tomorrow')}
+				>
 					{m.peta_filter_date_tomorrow()}
+				</button>
+				<button
+					class:active={eventsView.selectedDateMode === 'week'}
+					onclick={() => chooseDateMode('week')}
+				>
+					{m.peta_filter_date_week()}
 				</button>
 				<button onclick={() => (customDatePickerOpen = !customDatePickerOpen)}>
 					{m.peta_filter_date_custom()}
@@ -680,9 +712,10 @@
 							<button
 								type="button"
 								class:outside={!day.inMonth}
-								class:active={day.iso === activeDay}
+								class:active={eventsView.selectedDateMode === 'custom' &&
+									day.iso === eventsView.selectedCustomDate}
 								aria-label={m.peta_date_pick_label({ date: formatFullDate(day.iso) })}
-								onclick={() => chooseDate(day.iso)}
+								onclick={() => chooseCustomDate(day.iso)}
 							>
 								{day.label}
 							</button>

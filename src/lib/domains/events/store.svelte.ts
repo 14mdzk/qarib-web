@@ -2,7 +2,8 @@
  * Events domain — UI view state (context-DI factory).
  *
  * Owns UI-only state for the events/peta view:
- *   - `selectedDate`    — the ISO day string selected in the date strip (null = today).
+ *   - `selectedDateMode`   — global map date mode: today, tomorrow, week, or custom.
+ *   - `selectedCustomDate` — ISO date used only when selectedDateMode is custom.
  *   - `selectedPlaceId` — the map place (mosque) currently selected; null = no sheet.
  *   - `sheetMode`       — 'peek' | 'full' (controls pin sheet expansion).
  *
@@ -23,21 +24,24 @@ const KEY = Symbol('eventsView');
 export const DEFAULT_RADIUS_KM = 10;
 export const MAX_RADIUS_KM = 60;
 export const RADIUS_STEPS_KM = [10, 15, 25, 40, 60] as const;
+export type PetaDateMode = 'today' | 'tomorrow' | 'week' | 'custom';
 
 // ---------------------------------------------------------------------------
 // Service class
 // ---------------------------------------------------------------------------
 
 export class EventsViewService {
-	selectedDate = $state<string | null>(null);
+	selectedDateMode = $state<PetaDateMode>('today');
+	selectedCustomDate = $state<string | null>(null);
 	selectedRadiusKm = $state<number>(DEFAULT_RADIUS_KM);
 	selectedSubjectId = $state<string | null>(null);
 	selectedPlaceId = $state<string | null>(null);
 	sheetMode = $state<'peek' | 'full'>('peek');
 
-	/** Select a date strip day (ISO date string). Pass `null` to reset to "today". */
-	selectDate(date: string | null): void {
-		this.selectedDate = date;
+	/** Select the global map date mode. Custom dates are stored only for custom mode. */
+	selectDateMode(mode: PetaDateMode, customDate: string | null = null): void {
+		this.selectedDateMode = mode;
+		this.selectedCustomDate = mode === 'custom' ? customDate : null;
 	}
 
 	/** Select a search radius in kilometres. */
