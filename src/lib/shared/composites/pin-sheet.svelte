@@ -219,7 +219,18 @@
 			</button>
 		</div>
 
-		{#if mode === 'peek' && peekEvent}
+		{#if events.length === 0}
+			<div class="empty-events">
+				<div class="empty-events__title">{m.pin_sheet_no_events_title()}</div>
+				<div class="empty-events__body">{m.pin_sheet_no_events_body()}</div>
+			</div>
+
+			<button class="open-place-btn" onclick={onopenplace}>
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- trusted inline SVG icon, no user content -->
+				{@html MOSQUE_SVG}
+				{m.pin_sheet_open_place()}
+			</button>
+		{:else if mode === 'peek' && peekEvent}
 			<!-- Peek: one urgency event row -->
 			<div class="peek-event">
 				{#if urgencyLabel(peekEvent.tier)}
@@ -435,6 +446,23 @@
 		font-size: 11px;
 		color: var(--color-ink-3);
 		padding: 4px 0 2px;
+	}
+
+	.empty-events {
+		padding: 12px 0 10px;
+	}
+
+	.empty-events__title {
+		font-size: 13px;
+		font-weight: 700;
+		color: var(--color-ink);
+	}
+
+	.empty-events__body {
+		margin-top: 3px;
+		font-size: 11.5px;
+		line-height: 1.45;
+		color: var(--color-ink-3);
 	}
 
 	/* ── Day-filter chips (full mode) ──────────────────────────────────── */

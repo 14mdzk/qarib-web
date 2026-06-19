@@ -437,7 +437,7 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(page.getByRole('complementary').first()).toBeVisible();
 	});
 
-	test('place-only pin routes to tempat without opening PinSheet', async ({ page }) => {
+	test('place-only pin opens PinSheet without leaving the map', async ({ page }) => {
 		await page.goto('/peta');
 		await expect(page.locator('.leaflet-container').first()).toBeVisible({ timeout: 10_000 });
 
@@ -445,8 +445,10 @@ test.describe('/peta — Hi-Fi v2 map home', () => {
 		await expect(placePin).toHaveCount(1);
 		await placePin.click();
 
-		await expect(page).toHaveURL(/\/tempat\/place-soon-1$/);
-		await expect(page.getByRole('complementary')).toHaveCount(0);
+		await expect(page).toHaveURL(/\/peta$/);
+		const sheet = page.getByRole('complementary', { name: /Masjid Jami' As-Sunnah Cirebon/ });
+		await expect(sheet).toBeVisible();
+		await expect(sheet.getByRole('button', { name: /Buka detail masjid/i })).toBeVisible();
 	});
 
 	test('GPS FAB is rendered', async ({ page }) => {

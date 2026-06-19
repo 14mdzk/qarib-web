@@ -121,6 +121,8 @@
 	"map_toast_loading_label": "Notifikasi peta",
 	"pin_sheet_urgency_now": "SEKARANG",
 	"pin_sheet_urgency_soon": "SEGERA",
+	"pin_sheet_no_events_title": "Belum ada kajian pekan ini",
+	"pin_sheet_no_events_body": "Masjid ini belum punya jadwal kajian untuk pekan ini.",
 	"pin_sheet_open_place": "Buka detail masjid",
 	"pin_sheet_day_today": "Hari ini",
 	"pin_sheet_day_tomorrow": "Besok",

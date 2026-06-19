@@ -26,7 +26,7 @@
 		MAX_RADIUS_KM,
 		RADIUS_STEPS_KM
 	} from '$domains/events/store.svelte.js';
-	import { defineNearbyInfiniteQuery } from '$domains/events/queries.js';
+	import { defineEventListQuery, defineNearbyInfiniteQuery } from '$domains/events/queries.js';
 	import { definePlaceListQuery } from '$domains/places/queries.js';
 	import { defineSubjectListQuery } from '$domains/subject/queries.js';
 	import { deriveTier } from '$domains/events/pin-tier.js';
@@ -37,7 +37,7 @@
 	} from '$domains/events/place-pins.js';
 	import type { EventRecurringResponseWithPlace } from '$domains/events/schema.js';
 	import type { SubjectResponse } from '$domains/subject/schema.js';
-	import { dateRangeForMode, selectedIsoForMode } from './date-mode.js';
+	import { dateModeToInitialPinDay, dateRangeForMode, selectedIsoForMode } from './date-mode.js';
 	import {
 		CalendarDays,
 		ChevronLeft,
@@ -309,32 +309,59 @@
 	);
 
 	// ---------------------------------------------------------------------------
-	// Pin sheet data — built from the selected place's occurrences
+	// Pin sheet data — built from a selected-place 7-day occurrence query.
 	// ---------------------------------------------------------------------------
-	const selectedPlaceOccurrences = $derived(
-		eventsView.selectedPlaceId != null
-			? (events as EventRecurringResponseWithPlace[]).filter(
-					(e) => e.place?.id === eventsView.selectedPlaceId
-				)
-			: []
+	const selectedPlaceRange = $derived(
+		todayIso
+			? {
+					date_from: toDateRange(todayIso).date_from,
+					date_to: toDateRange(addIsoDateDays(todayIso, 7)).date_to
+				}
+			: null
 	);
-	const selectedPlaceHasTodayEvents = $derived(selectedPlaceOccurrences.length > 0);
+
+	const selectedPlaceEventsQuery = defineEventListQuery(
+		() => ({
+			place_id: eventsView.selectedPlaceId ?? undefined,
+			subject_id: eventsView.selectedSubjectId ?? undefined,
+			date_from: selectedPlaceRange?.date_from,
+			date_to: selectedPlaceRange?.date_to,
+			expand: 'place',
+			limit: 30
+		}),
+		{
+			enabled: () =>
+				browserReady && eventsView.selectedPlaceId != null && selectedPlaceRange != null,
+			staleTime: 60_000
+		}
+	);
+
+	const selectedPlaceOccurrences = $derived(
+		(selectedPlaceEventsQuery.data?.data ?? []) as EventRecurringResponseWithPlace[]
+	);
+
+	const selectedMapOccurrence = $derived(
+		(events as EventRecurringResponseWithPlace[]).find(
+			(e) => e.place?.id === eventsView.selectedPlaceId
+		) ?? null
+	);
+
+	const selectedNearbyPlace = $derived(
+		nearbyPlaces.find((place) => place.id === eventsView.selectedPlaceId) ?? null
+	);
 
 	const sheetPlace = $derived<SheetPlace | null>(
-		selectedPlaceOccurrences.length > 0
-			? (() => {
-					const place = selectedPlaceOccurrences[0].place;
-					const distKm =
-						typeof selectedPlaceOccurrences[0].distance_km === 'number'
-							? selectedPlaceOccurrences[0].distance_km
-							: null;
-					return {
-						name: l10n(place.name),
-						distanceLabel: distKm != null ? formatDistance(distKm) : '',
-						address: place.address ?? undefined
-					};
-				})()
-			: null
+		(() => {
+			const occurrence = selectedPlaceOccurrences[0] ?? selectedMapOccurrence;
+			const place = occurrence?.place ?? selectedNearbyPlace;
+			if (!place) return null;
+			const distKm = typeof occurrence?.distance_km === 'number' ? occurrence.distance_km : null;
+			return {
+				name: l10n(place.name),
+				distanceLabel: distKm != null ? formatDistance(distKm) : '',
+				address: place.address ?? undefined
+			};
+		})()
 	);
 
 	const sheetEvents = $derived<SheetEvent[]>(
@@ -428,14 +455,8 @@
 
 	function handlePinClick(id: string | number): void {
 		const placeId = typeof id === 'string' ? id : String(id);
-		const hasTodayEvent = (events as EventRecurringResponseWithPlace[]).some(
-			(e) => e.place?.id === placeId
-		);
-		if (hasTodayEvent) {
-			eventsView.selectPlace(placeId);
-		} else {
-			navigateToPlace(placeId);
-		}
+		eventsView.selectPlace(placeId);
+		activePinDay = dateModeToInitialPinDay(eventsView.selectedDateMode);
 	}
 
 	const fallbackPlaces = $derived(groupFuturePlaces(fallbackEvents, formatDateChip));
@@ -788,7 +809,7 @@
 	<MapFab onlocate={() => location.requestGps()} loading={location.requesting} />
 
 	<!-- Pin sheet — shown when a place is selected -->
-	{#if eventsView.selectedPlaceId != null && sheetPlace != null && selectedPlaceHasTodayEvents}
+	{#if eventsView.selectedPlaceId != null && sheetPlace != null}
 		<PinSheet
 			place={sheetPlace}
 			events={sheetEvents}
