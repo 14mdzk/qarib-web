@@ -106,58 +106,6 @@ function defaultOccurrences() {
 	];
 }
 
-function futureFallbackOccurrences() {
-	const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-	const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-	return [
-		occurrence({
-			id: 2001,
-			event_id: 'uuid-future-a',
-			name: { id: 'Kajian Fiqih Mendatang' },
-			date_start: tomorrow,
-			distance_km: 18,
-			place: {
-				id: 'place-future-1',
-				slug: 'masjid-future-one',
-				name: { id: 'Masjid Masa Depan' },
-				address: 'Jl. Besok No. 1, Cirebon',
-				lat: -6.71,
-				lng: 108.58
-			}
-		}),
-		occurrence({
-			id: 2002,
-			event_id: 'uuid-future-a',
-			name: { id: 'Kajian Fiqih Pekanan' },
-			date_start: nextWeek,
-			distance_km: 18,
-			place: {
-				id: 'place-future-1',
-				slug: 'masjid-future-one',
-				name: { id: 'Masjid Masa Depan' },
-				address: 'Jl. Besok No. 1, Cirebon',
-				lat: -6.71,
-				lng: 108.58
-			}
-		}),
-		occurrence({
-			id: 2003,
-			event_id: 'uuid-future-c',
-			name: { id: 'Kajian Sirah Mendatang' },
-			date_start: nextWeek,
-			distance_km: 42,
-			place: {
-				id: 'place-future-2',
-				slug: 'masjid-future-two',
-				name: { id: 'Masjid Radius Luas' },
-				address: 'Jl. Luas No. 2, Cirebon',
-				lat: -6.69,
-				lng: 108.6
-			}
-		})
-	];
-}
-
 // ---------------------------------------------------------------------------
 // Route definitions
 // ---------------------------------------------------------------------------
@@ -307,7 +255,6 @@ prefixRoutes.push({
 	handler: (req, res) => {
 		const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
 		const subjectId = params.get('subject_id');
-		const radiusKm = Number(params.get('radius_km') ?? '10');
 		const limit = Number(params.get('limit') ?? '10');
 
 		if (subjectId === 'subject-empty' && limit < 30) {
@@ -315,14 +262,6 @@ prefixRoutes.push({
 				success: true,
 				data: [],
 				pagination: pagination(0)
-			});
-		}
-
-		if (subjectId === 'subject-empty' && radiusKm >= 60 && limit >= 30) {
-			return json(res, 200, {
-				success: true,
-				data: futureFallbackOccurrences(),
-				pagination: pagination(3)
 			});
 		}
 
