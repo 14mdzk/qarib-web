@@ -1,0 +1,21 @@
+---
+import { getMessages } from '../lib/i18n';
+
+const m = getMessages('id');
+---
+
+<section id="cara-kerja" class="bg-surface-2 scroll-mt-16 px-6 py-20 sm:py-24">
+	<div class="mx-auto max-w-2xl text-center">
+		<p class="text-primary flex items-center justify-center gap-3 text-xs font-bold tracking-[0.15em] uppercase">
+			<span class="bg-accent h-px w-7" aria-hidden="true"></span>
+			{m.problem_eyebrow}
+			<span class="bg-accent h-px w-7" aria-hidden="true"></span>
+		</p>
+		<h2 class="text-content mt-5 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
+			{m.problem_title_pre}
+			<span class="text-primary font-serif italic">{m.problem_title_em}</span>
+			{m.problem_title_post}
+		</h2>
+		<p class="text-content-2 mx-auto mt-5 max-w-xl text-lg leading-relaxed">{m.problem_body}</p>
+	</div>
+</section>

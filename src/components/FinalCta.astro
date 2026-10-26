@@ -1,0 +1,23 @@
+---
+import { getMessages } from '../lib/i18n';
+
+const m = getMessages('id');
+---
+
+<section id="unduh" class="bg-surface scroll-mt-16 px-6 py-20 sm:py-24">
+	<div class="bg-ink mx-auto max-w-4xl rounded-xl px-8 py-14 text-center shadow-xl sm:px-14">
+		<h2 class="text-3xl leading-tight font-bold tracking-tight text-paper sm:text-4xl">
+			{m.cta_title_pre}
+			<span class="font-serif text-orange italic">{m.cta_title_em}</span>
+		</h2>
+		<p class="mx-auto mt-4 max-w-md text-lg leading-relaxed text-paper-2">{m.cta_body}</p>
+		<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+			<span class="rounded-lg border border-line-2 px-5 py-3 text-base font-semibold text-paper">
+				{m.store_soon} {m.store_appstore}
+			</span>
+			<span class="rounded-lg border border-line-2 px-5 py-3 text-base font-semibold text-paper">
+				{m.store_soon} {m.store_googleplay}
+			</span>
+		</div>
+	</div>
+</section>
