@@ -10,38 +10,38 @@ const m = getMessages('id');
 		<div class="absolute bottom-[-40%] left-[-5%] h-72 w-72 rounded-full bg-surface-2 blur-3xl"></div>
 	</div>
 	<div class="relative mx-auto max-w-6xl px-6 py-16 sm:py-24">
-		<div class="max-w-xl">
-			<img
-				src="/tile.png"
-				alt="Logo Qarib"
-				width="72"
-				height="72"
-				class="rounded-xl shadow-lg"
-			/>
-			<p class="font-arabic text-content-3 mt-6 text-2xl">{m.app_title_ar}</p>
-			<p class="text-primary mt-3 flex items-center gap-2 text-xs font-bold tracking-[0.15em] uppercase">
-				<span class="bg-accent inline-block h-1.5 w-1.5 rounded-full" aria-hidden="true"></span>
-				{m.eyebrow}
-			</p>
-			<h1 class="text-content mt-4 text-5xl leading-[1.05] font-bold tracking-tight sm:text-6xl">
-				<span class="text-primary font-serif italic">{m.hero_kajian}</span>
-				<br />
-				{m.hero_headline}
-			</h1>
-			<p class="text-content-2 mt-6 text-lg leading-relaxed sm:text-xl">{m.hero_lede}</p>
-			<div class="mt-8 flex flex-wrap items-center gap-3">
-				<a
-					href="#unduh"
-					class="bg-primary rounded-full px-6 py-3 text-base font-semibold text-white"
-				>
-					{m.cta_primary}
-				</a>
-				<a
-					href="#cara-kerja"
-					class="border-border text-content rounded-full border px-6 py-3 text-base font-semibold"
-				>
-					{m.cta_secondary}
-				</a>
+		<div class="grid items-center gap-10 lg:grid-cols-2 lg:gap-6">
+			<div class="anim-hero-rise max-w-xl">
+				<h1 class="text-content text-5xl leading-[1.05] font-bold tracking-tight sm:text-6xl">
+					<span class="text-primary font-serif italic">{m.hero_kajian}</span>
+					<br />
+					{m.hero_headline}
+				</h1>
+				<p class="text-content-2 mt-6 text-lg leading-relaxed sm:text-xl">{m.hero_lede}</p>
+				<div class="mt-8 flex flex-wrap items-center gap-3">
+					<a
+						href="#unduh"
+						class="bg-primary hover:bg-primary-hover rounded-full px-6 py-3 text-base font-semibold text-white transition-colors"
+					>
+						{m.cta_primary}
+					</a>
+					<a
+						href="#cara-kerja"
+						class="border-border text-content hover:border-content-4 rounded-full border px-6 py-3 text-base font-semibold transition-colors"
+					>
+						{m.cta_secondary}
+					</a>
+				</div>
+			</div>
+			<div class="anim-hero-float mx-auto w-full max-w-md lg:max-w-none">
+				<img
+					src="/hero-map.png"
+					alt="Ilustrasi peta menuju masjid terdekat"
+					width="1024"
+					height="1024"
+					class="h-auto w-full"
+					loading="eager"
+				/>
 			</div>
 		</div>
 	</div>
