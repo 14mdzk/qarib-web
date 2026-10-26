@@ -1,0 +1,25 @@
+---
+import '../styles/tokens.css';
+import { getMessages } from '../lib/i18n';
+
+const m = getMessages('id');
+---
+
+<!doctype html>
+<html lang="id">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{m.meta_title}</title>
+		<meta name="description" content={m.meta_description} />
+		<meta name="theme-color" content="#fdfaf4" />
+		<link rel="icon" type="image/png" href="/tile.png" />
+		<meta property="og:title" content={m.meta_title} />
+		<meta property="og:description" content={m.meta_description} />
+		<meta property="og:type" content="website" />
+		<meta property="og:image" content="/tile.png" />
+	</head>
+	<body class="bg-surface text-content antialiased">
+		<slot />
+	</body>
+</html>

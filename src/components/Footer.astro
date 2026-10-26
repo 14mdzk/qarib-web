@@ -1,0 +1,20 @@
+---
+import { getMessages } from '../lib/i18n';
+
+const m = getMessages('id');
+---
+
+<footer class="border-border bg-surface border-t px-6 py-10">
+	<div class="text-content-3 mx-auto flex max-w-6xl flex-col items-center gap-3 text-center text-base sm:flex-row sm:justify-between sm:text-left">
+		<p>{m.footer_copy}</p>
+		<p>
+			<span class="font-arabic" lang="ar">{m.footer_dua_ar}</span>
+			{m.footer_dua}
+		</p>
+		<p class="flex items-center gap-4">
+			<span>{m.footer_privacy}</span>
+			<span aria-hidden="true">·</span>
+			<span>{m.footer_contact}</span>
+		</p>
+	</div>
+</footer>

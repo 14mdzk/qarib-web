@@ -1,0 +1,113 @@
+/* Qarib v2 design tokens — salvaged from qarib-web v1 (brand identity stays).
+ * Trimmed for a landing-only page: map pin tokens, loading keyframes, and
+ * app-only colors (green/blue/danger) did not survive the ditch.
+ * Tailwind v4: every --color-* / --radius-* / --shadow-* / --font-* token
+ * generates utilities. Class-based dark mode (.dark on <html>).
+ */
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
+@import '@fontsource-variable/fraunces/wght.css';
+@import '@fontsource-variable/fraunces/wght-italic.css';
+@import '@fontsource/noto-naskh-arabic/index.css';
+
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	/* Orange (primary action) */
+	--color-orange-50: #fff4e5;
+	--color-orange-100: #fce4c7;
+	--color-orange: #e88b2e;
+	--color-orange-600: #c9711c;
+	--color-orange-700: #a35711;
+
+	/* Ink (text ramp) */
+	--color-ink: #1a1510;
+	--color-ink-2: #4a3f30;
+	--color-ink-3: #7a6f60;
+	--color-ink-4: #a89e8e;
+
+	/* Paper (warm backgrounds) */
+	--color-paper: #fdfaf4;
+	--color-paper-2: #f7f1e5;
+	--color-paper-3: #f0e9d8;
+
+	/* Line (borders) */
+	--color-line: #e8e1d3;
+	--color-line-2: #d4cbb8;
+
+	/* Semantic (single lever for surface/text/border/action) */
+	--color-surface: #fdfaf4;
+	--color-surface-2: #f7f1e5;
+	--color-surface-3: #f0e9d8;
+	--color-content: #1a1510;
+	--color-content-2: #4a3f30;
+	--color-content-3: #7a6f60;
+	--color-content-4: #a89e8e;
+	--color-border: #e8e1d3;
+	--color-border-2: #d4cbb8;
+	--color-primary: #a35711;
+	--color-primary-hover: #c9711c;
+	--color-accent: #e88b2e;
+
+	/* Radius scale */
+	--radius-sm: 10px;
+	--radius: 14px;
+	--radius-lg: 20px;
+	--radius-xl: 28px;
+
+	/* Shadow scale (warm-tinted) */
+	--shadow-sm: 0 1px 2px rgba(26, 21, 16, 0.06);
+	--shadow: 0 2px 8px rgba(26, 21, 16, 0.08), 0 1px 2px rgba(26, 21, 16, 0.04);
+	--shadow-lg: 0 8px 24px rgba(26, 21, 16, 0.12), 0 2px 6px rgba(26, 21, 16, 0.06);
+	--shadow-xl: 0 30px 60px -20px rgba(26, 21, 16, 0.3), 0 10px 25px rgba(26, 21, 16, 0.1);
+
+	/* Fonts */
+	--font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+	--font-serif: 'Fraunces', serif;
+	--font-arabic: 'Noto Naskh Arabic', serif;
+}
+
+:root {
+	--duration-fast: 100ms;
+	--duration-base: 180ms;
+	--duration-slow: 280ms;
+	--font-size-base: 15px;
+	--line-height-base: 1.45;
+	--control-h-md: 36px;
+	--control-h-lg: 44px;
+}
+
+html {
+	font-family: var(--font-sans);
+	font-size: var(--font-size-base);
+	line-height: var(--line-height-base);
+	scroll-behavior: smooth;
+}
+
+.dark {
+	--color-surface: #15100a;
+	--color-surface-2: #1c1610;
+	--color-surface-3: #0f0b06;
+	--color-content: #f4eddd;
+	--color-content-2: #d9cfb9;
+	--color-content-3: #b8ae98;
+	--color-content-4: #8a806e;
+	--color-border: #2d2517;
+	--color-border-2: #3d3426;
+	--color-primary: #f0b56a;
+	--color-primary-hover: #f0b56a;
+	--color-accent: #f0b56a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0ms !important;
+		transition-duration: 0ms !important;
+	}
+}

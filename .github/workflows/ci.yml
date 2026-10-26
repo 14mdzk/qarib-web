@@ -10,36 +10,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
-    name: check / lint / test / build
+  build:
+    name: install + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Cache bun store
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
       - name: Install
         run: bun install --frozen-lockfile
-      - name: Codegen (paraglide)
-        run: bun run codegen
-      - name: Typecheck
-        run: bun run check
-      - name: Lint
-        run: bun run lint
-      - name: Unit tests
-        run: bun run test
       - name: Build
-        env:
-          # Private env vars consumed from `$env/static/private` at build time.
-          # CI has no `.env`, so we provide CI-safe placeholders. Real deployments
-          # populate via the platform env (Vercel, Fly, etc.).
-          UPSTREAM_API_URL: https://upstream.example.com
-          STADIA_API_KEY: ci-build-placeholder
         run: bun run build
