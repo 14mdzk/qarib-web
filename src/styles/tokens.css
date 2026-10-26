@@ -111,3 +111,36 @@ html {
 		transition-duration: 0ms !important;
 	}
 }
+
+/* ─── Landing motion (subtle set) ────────────────────────────────────────── */
+/* Entrance runs once; float loops gently. Both collapse to their end state
+ * under prefers-reduced-motion via the zero-duration rule above. No base
+ * opacity:0 anywhere, so content never hides if animations don't run. */
+@keyframes hero-rise {
+	from {
+		opacity: 0;
+		transform: translateY(14px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes hero-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-10px);
+	}
+}
+
+.anim-hero-rise {
+	animation: hero-rise var(--duration-slow) ease-out both;
+}
+
+.anim-hero-float {
+	animation: hero-float 7s ease-in-out infinite;
+}
